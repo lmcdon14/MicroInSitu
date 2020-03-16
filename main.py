@@ -1,3 +1,7 @@
+# Code adapted from Chris Baird's repository on github:
+# cdbaird/TL-rotation-control
+
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 from td_gui import Ui_TapeDriveWindow
 
