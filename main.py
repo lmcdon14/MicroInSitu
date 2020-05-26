@@ -12,49 +12,64 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self):
 		super().__init__()
 		self.setupUi(self)
+		
 		self.tapedrive = td.Tapedrive()
+		self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
 		# Set default stepsize
 		self.tapedrive.motor.set_('stepsize', 
 			self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
-
+		
 		self.btnForward.clicked.connect(self.forward)
+		#self.btnForward.clicked.connect(self.absolute)
 		self.btnBackward.clicked.connect(self.backward)
 		self.btnHome.clicked.connect(self.home)
-		self.btnIsolate.clicked.connect(self.isolate)
 
 		self.verticalSlider.valueChanged.connect(self.on_slider_drag)
 		self.verticalSlider.sliderReleased.connect(self.on_slider_release)
+		self.spinBox.valueChanged.connect(self.on_spin_box)
 		self.homeEnable.toggled.connect(self.home_button_toggle)
-		self.IsolateEnable.toggled.connect(self.isolate_button_toggle)
 
 	def forward(self):
-		self.tapedrive.motor.do_('forward')
+		pos = self.tapedrive.motor.do_('forward')
+		if pos != 420:
+			self.absCoords.setValue(pos)
 
 	def backward(self):
-		self.tapedrive.motor.do_('backward')
+		pos = self.tapedrive.motor.do_('backward')
+		if pos != 420:
+			self.absCoords.setValue(pos)
+
+	def absolute(self):
+		pos = self.tapedrive.motor.do_('absolute', data=self.tapedrive.motor.deg_to_hex(self.spinBox.value()))
+		if pos != 420:
+			self.absCoords.setValue(pos)
 
 	def home(self):
-		self.tapedrive.motor.do_('home')
-
-	def isolate(self):
-		self.tapedrive.motor.set_('isolate', '01')
+		pos = self.tapedrive.motor.do_('home')
+		if pos != 420:
+			self.absCoords.setValue(pos)
 
 	def on_slider_drag(self):
 		val = self.verticalSlider.value()
 		self.spinBox.setValue(val)
 
+	def on_spin_box(self):
+		val = self.spinBox.value()
+		self.verticalSlider.setValue(val)
+		cmd_val = self.tapedrive.motor.deg_to_hex(val)
+		#print(cmd_val)
+		self.tapedrive.motor.set_('stepsize', cmd_val)
+		self.tapedrive.motor.get_('stepsize')
+
 	def on_slider_release(self):
 		val = self.verticalSlider.value()
 		cmd_val = self.tapedrive.motor.deg_to_hex(val)
 		#print(cmd_val)
-		self.tapedrive.motor.set_('stepsize', self.tapedrive.motor.deg_to_hex(val))
+		self.tapedrive.motor.set_('stepsize', cmd_val)
 		self.tapedrive.motor.get_('stepsize')
 
 	def home_button_toggle(self):
 		self.btnHome.setEnabled(self.homeEnable.isChecked())
-
-	def isolate_button_toggle(self):
-		self.btnIsolate.setEnabled(self.IsolateEnable.isChecked())
 		
 
 

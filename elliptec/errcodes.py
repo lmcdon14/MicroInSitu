@@ -7,7 +7,7 @@ error_codes = {
 	'4' : 'Value Out of Range',
 	'5' : 'Module Isolated',
 	'6' : 'Module Out of Isolation',
-	'7' : 'Initialisation Error',
+	'7' : 'Initialization Error',
 	'8' : 'Thermal Error',
 	'9' : 'Busy',
 	'10': 'Sensor Error',

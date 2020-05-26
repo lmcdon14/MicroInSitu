@@ -24,5 +24,5 @@ def commands():
 	return [get_, set_, mov_]
 
 if __name__ == '__main__':
-	keys = cmd.keys()
+	keys = commands()[0].keys()
 	print('\n'.join(keys))

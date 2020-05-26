@@ -41,6 +41,11 @@ class Motor(serial.Serial):
 			self.status = parse(self.response)
 			move_check(self.status)
 
+			if type(self.status[1]) == int:
+				return round(self.status[1]*(360/143360))%360
+			else:
+				return 420
+
 	def set_(self, req='', data='', addr='0'):
 		try:
 			instruction = set_[req]
@@ -71,9 +76,13 @@ class Motor(serial.Serial):
 			self.write(command)
 			#print(command)
 			response = self.read_until(terminator=b'\n')
-			print(response)
+			#print(response)
 			self.status = parse(response)
 			error_check(self.status)
+
+			if req == 'position':
+				#print(self.status[1])
+				return round(self.status[1]*(360/143360))%360
 
 	def deg_to_hex(self, deg):
 		factor = self.counts_per_rev//self.range
@@ -82,7 +91,7 @@ class Motor(serial.Serial):
 
 	def hex_to_deg(self, hexval):
 		factor = self.counts_per_rev//self.range
-		val = round(int(val,16)/factor)
+		val = round(int(hexval,16)/factor)
 		return val
 
 

@@ -110,19 +110,12 @@ class Parser():
 		return (addr, code, data)
 
 
-
-
-
-
-
 def test():
 	test_request = b'0in'
 	test_response = b'0IN081080004120170701016800040000\r\n'
 	parser = Parser(test_request, test_response)
 	print(parser.request)
 	print(parser.response)
-
-
 
 
 if __name__ =='__main__':
