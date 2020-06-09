@@ -7,6 +7,7 @@ from td_gui import Ui_TapeDriveWindow
 
 import elliptec.tapedrive as td
 import elliptec
+import agilent as ag
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self):
@@ -14,6 +15,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.setupUi(self)
 		
 		self.tapedrive = td.Tapedrive()
+		self.psus = ag.MagneticField()
 		self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
 		# Set default stepsize
 		self.tapedrive.motor.set_('stepsize', 

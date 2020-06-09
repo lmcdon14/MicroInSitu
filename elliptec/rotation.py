@@ -6,7 +6,6 @@ from . import status
 
 
 class Motor(serial.Serial):
-
 	def __init__(self, port, baudrate=9600, bytesize=8, parity='N', timeout=2):
 		try:
 			#self.motor = s.Serial(port, baud, bytesize, parity)
