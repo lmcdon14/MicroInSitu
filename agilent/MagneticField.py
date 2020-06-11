@@ -4,8 +4,9 @@ import sys
 from agilent import PowerSupply, find_ports
 
 class MagneticField():
-	def __init__(self, psus=[None]):
+	def __init__(self, psus=[None]*2):
 		if (psus[0] is None):
+			self.psus = psus
 			try:
 				self.mod_num = "E3633A"
 				self.connect_supplies()
@@ -18,9 +19,11 @@ class MagneticField():
 			self.psus = psus
 
 	def connect_supplies(self):
-		ports = find_ports()
-		ix=0
-		for port in ports:
-			if (port.serial_number == self.mod_num):
-				self.psus[ix] = PowerSupply(port.device)
-				ix=ix+1
+		#ports = find_ports()
+		#ix=0
+		# for port in ports:
+		# 	if (port.serial_number == self.mod_num):
+		# 		self.psus[ix] = PowerSupply(port.device)
+		# 		ix=ix+1
+		for i in range(2):
+			self.psus[i] = PowerSupply('test', sim=True)
