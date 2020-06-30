@@ -7,13 +7,66 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+import sys
+import re
+        
+class MyButton(QtWidgets.QPushButton):
+    def __init__(self, widget, font2):
+        super().__init__(widget)
+        self.setGeometry(QtCore.QRect(80, 875, 160, 50))
+        self.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
+        self.setFont(font2)
+        self.setText("Ramp Current")
+        self.setObjectName("lasOut")
+        self.co_get = 0
+        self.co_set = 0
+
+    def _set_color(self, col):
+        palette = self.palette()
+        palette.setColor(self.foregroundRole(), col)
+        self.setPalette(palette)
+
+    def parseStyleSheet(self):
+        ss = self.styleSheet()
+        sts = [s.strip() for s in ss.split(';') if len(s.strip())]
+        return sts
+
+    def getBackColor(self):
+        self.co_get += 1
+        # print(fuin(), self.co_get)
+        return self.palette().color(self.pal_ele)
+
+    def setBackColor(self, color):
+        self.co_set += 1
+        sss = self.parseStyleSheet()
+        if color.alpha() == 0:
+            alph = 0.5
+        else:
+            alph = color.alpha()
+        bg_new = 'background-color: rgba(%2.1f,%2.1f,%2.1f,%2.1f)' % (color.red(), color.green(), color.blue(), alph)
+
+        for k, sty in enumerate(sss):
+            if re.search('background-color:', sty):
+                sss[k] = bg_new
+                break
+        else:
+            sss.append(bg_new)
+
+        self.setStyleSheet('QPushButton {' + '; '.join(sss))
+        #print('QPushButton {' + '; '.join(sss))
+
+    pal_ele = QtGui.QPalette.Window
+    zcolor = QtCore.pyqtProperty(QtGui.QColor, getBackColor, setBackColor)
+
+    color = QtCore.pyqtProperty(QtGui.QColor, fset=_set_color)
+
 
 class Ui_TapeDriveWindow(object):
     def setupUi(self, TapeDriveWindow):
         # Setup window
         TapeDriveWindow.setObjectName("TapeDriveWindow")
-        TapeDriveWindow.resize(640, 725)
-        TapeDriveWindow.setMinimumSize(QtCore.QSize(640, 725))
+        TapeDriveWindow.resize(640, 975)
+        TapeDriveWindow.setMinimumSize(QtCore.QSize(640, 950))
         TapeDriveWindow.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
         TapeDriveWindow.setStyleSheet("TapeDriveWindow {qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255))}")
         self.centralwidget = QtWidgets.QWidget(TapeDriveWindow)
@@ -174,6 +227,42 @@ class Ui_TapeDriveWindow(object):
         self.label_hr.setStyleSheet("QLabel {font-size: 12px; color: black; border-radius: 5px;}")
         self.label_hr.setAlignment(QtCore.Qt.AlignCenter)
         self.label_hr.setObjectName("label_hr")
+        # Laser PS Label
+        self.label_lps = QtWidgets.QLabel(self.centralwidget)
+        self.label_lps.setGeometry(QtCore.QRect(10, 720, 301, 41))
+        self.label_lps.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
+        self.label_lps.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_lps.setObjectName("label_lps")
+        # Laser Setpoint Label
+        self.label_lassp = QtWidgets.QLabel(self.centralwidget)
+        self.label_lassp.setGeometry(QtCore.QRect(5, 775, 100, 41))
+        self.label_lassp.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_lassp.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_lassp.setObjectName("label_lassp")
+        # Laser Ramp Rate Label
+        self.label_rampsp = QtWidgets.QLabel(self.centralwidget)
+        self.label_rampsp.setGeometry(QtCore.QRect(5, 825, 100, 41))
+        self.label_rampsp.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_rampsp.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_rampsp.setObjectName("label_rampsp")
+        # Photodiodes Label
+        self.label_pds = QtWidgets.QLabel(self.centralwidget)
+        self.label_pds.setGeometry(QtCore.QRect(330, 720, 301, 41))
+        self.label_pds.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
+        self.label_pds.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_pds.setObjectName("label_pds")
+        # PD1 Label
+        self.label_pd1 = QtWidgets.QLabel(self.centralwidget)
+        self.label_pd1.setGeometry(QtCore.QRect(325, 775, 100, 41))
+        self.label_pd1.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_pd1.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_pd1.setObjectName("label_pd1")
+        # PD2 Label
+        self.label_pd2 = QtWidgets.QLabel(self.centralwidget)
+        self.label_pd2.setGeometry(QtCore.QRect(325, 825, 100, 41))
+        self.label_pd2.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_pd2.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_pd2.setObjectName("label_pd2")
 
         # Power Supply Control 1
         self.ps1spinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -221,6 +310,28 @@ class Ui_TapeDriveWindow(object):
         self.ovenspinBox.setProperty("value", 20.0)
         self.ovenspinBox.setObjectName("ovenspinBox")
 
+        # Laser Output Control
+        self.lasspinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.lasspinBox.setGeometry(QtCore.QRect(110, 775, 100, 40))
+        self.lasspinBox.setFont(font)
+        self.lasspinBox.setAlignment(QtCore.Qt.AlignHCenter)
+        self.lasspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.lasspinBox.setMinimum(0.0)
+        self.lasspinBox.setMaximum(45.0)
+        self.lasspinBox.setProperty("value", 0.0)
+        self.lasspinBox.setObjectName("lasspinBox")
+
+        # Laser Ramp Rate Control
+        self.rampspinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.rampspinBox.setGeometry(QtCore.QRect(110, 825, 100, 40))
+        self.rampspinBox.setFont(font)
+        self.rampspinBox.setAlignment(QtCore.Qt.AlignHCenter)
+        self.rampspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.rampspinBox.setMinimum(0.0)
+        self.rampspinBox.setMaximum(3.0)
+        self.rampspinBox.setProperty("value", 2.0)
+        self.rampspinBox.setObjectName("rampspinBox")
+
         # Cell Wall Readout
         self.cellreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
         self.cellreadout.setGeometry(QtCore.QRect(110, 650, 100, 40))
@@ -229,8 +340,6 @@ class Ui_TapeDriveWindow(object):
         self.cellreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.cellreadout.setAlignment(QtCore.Qt.AlignHCenter)
         self.cellreadout.setStyleSheet("color: red;")
-        self.cellreadout.setMinimum(0.0)
-        self.cellreadout.setMaximum(300.0)
         self.cellreadout.setObjectName("cellreadout")
 
         # Oven Wall Readout
@@ -241,9 +350,37 @@ class Ui_TapeDriveWindow(object):
         self.ovenreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.ovenreadout.setAlignment(QtCore.Qt.AlignHCenter)
         self.ovenreadout.setStyleSheet("color: lightgrey;")
-        self.ovenreadout.setMinimum(0.0)
-        self.ovenreadout.setMaximum(300.0)
         self.ovenreadout.setObjectName("ovenreadout")
+
+        # Photodiode 1 Readout
+        self.pdreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.pdreadout.setGeometry(QtCore.QRect(430, 775, 100, 40))
+        self.pdreadout.setFont(font)
+        self.pdreadout.setReadOnly(True)
+        self.pdreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.pdreadout.setAlignment(QtCore.Qt.AlignHCenter)
+        self.pdreadout.setStyleSheet("color: black;")
+        self.pdreadout.setObjectName("pdreadout")
+
+        # Photodiode 2 Readout
+        self.pd2readout = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.pd2readout.setGeometry(QtCore.QRect(430, 825, 100, 40))
+        self.pd2readout.setFont(font)
+        self.pd2readout.setReadOnly(True)
+        self.pd2readout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.pd2readout.setAlignment(QtCore.Qt.AlignHCenter)
+        self.pd2readout.setStyleSheet("color: black;")
+        self.pd2readout.setObjectName("pd2readout")
+
+        # Laser Current Readout
+        self.lasreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.lasreadout.setGeometry(QtCore.QRect(210, 775, 100, 40))
+        self.lasreadout.setFont(font)
+        self.lasreadout.setReadOnly(True)
+        self.lasreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.lasreadout.setAlignment(QtCore.Qt.AlignHCenter)
+        self.lasreadout.setStyleSheet("color: black;")
+        self.lasreadout.setObjectName("lasreadout")
 
         # PS1 Output Enable
         self.ps1Out = QtWidgets.QPushButton(self.centralwidget)
@@ -269,11 +406,21 @@ class Ui_TapeDriveWindow(object):
         # Oven Toggle 
         self.oventog = QtWidgets.QPushButton(self.centralwidget)
         self.oventog.setGeometry(QtCore.QRect(240, 625, 160, 50))
-        self.oventog.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;}")
+        self.oventog.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
         self.oventog.setFont(font2)
         self.oventog.setCheckable(True)
         self.oventog.setText("Cell Wall")
         self.oventog.setObjectName("oventog")
+
+        # Laser Ramp Control
+        self.lasOut = MyButton(self.centralwidget, font2)
+        self.anim = QtCore.QPropertyAnimation(self.lasOut, b"zcolor")
+        self.anim.setDuration(750)
+        self.anim.setLoopCount(1)
+        self.anim.setStartValue(QtGui.QColor(0,0,0,0.5))
+        self.anim.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
+        self.anim.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
+        self.anim.setEndValue(QtGui.QColor(0,0,0,0.5))
 
         TapeDriveWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(TapeDriveWindow)
@@ -292,6 +439,7 @@ class Ui_TapeDriveWindow(object):
         QtCore.QMetaObject.connectSlotsByName(TapeDriveWindow)
 
     def retranslateUi(self, TapeDriveWindow):
+        degree_sign = u"\N{DEGREE SIGN}"
         _translate = QtCore.QCoreApplication.translate
         TapeDriveWindow.setWindowTitle(_translate("TapeDriveWindow", "Micro In-Situ Control"))
         self.homeEnable.setText(_translate("TapeDriveWindow", "Enable"))
@@ -302,10 +450,16 @@ class Ui_TapeDriveWindow(object):
         self.label_m.setText(_translate("TapeDriveWindow", "Main Field"))
         self.label_c.setText(_translate("TapeDriveWindow", "Compensation Field"))
         self.label_o.setText(_translate("TapeDriveWindow", "Oven Control"))
-        self.label_cs.setText(_translate("TapeDriveWindow", "Cell Wall\nSetpoint"))
-        self.label_os.setText(_translate("TapeDriveWindow", "Oven Wall\nSetpoint"))
-        self.label_cr.setText(_translate("TapeDriveWindow", "Cell Wall\nReadout"))
-        self.label_or.setText(_translate("TapeDriveWindow", "Oven Wall\nReadout"))
+        self.label_lps.setText(_translate("TapeDriveWindow", "Laser Power"))
+        self.label_pds.setText(_translate("TapeDriveWindow", "Photodiodes"))
+        self.label_cs.setText(_translate("TapeDriveWindow", "Cell Wall\nSetpoint (" + degree_sign + "C)"))
+        self.label_os.setText(_translate("TapeDriveWindow", "Oven Wall\nSetpoint (" + degree_sign + "C)"))
+        self.label_cr.setText(_translate("TapeDriveWindow", "Cell Wall\nReadout (" + degree_sign + "C)"))
+        self.label_or.setText(_translate("TapeDriveWindow", "Oven Wall\nReadout (" + degree_sign + "C)"))
+        self.label_lassp.setText(_translate("TapeDriveWindow", "Current\nSetpoint (A)"))
+        self.label_rampsp.setText(_translate("TapeDriveWindow", "Ramp Rate\n(A/s)"))
+        self.label_pd1.setText(_translate("TapeDriveWindow", "Transmission\nPhotodiode"))
+        self.label_pd2.setText(_translate("TapeDriveWindow", "EPR\nPhotodiode"))
         self.label_hr.setText(_translate("TapeDriveWindow", "Angle Readout"))
         self.label_cos.setText(_translate("TapeDriveWindow", "Current Setpoint (A)"))
         self.label_ms.setText(_translate("TapeDriveWindow", "Current Setpoint (A)"))

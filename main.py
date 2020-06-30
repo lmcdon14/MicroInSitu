@@ -4,27 +4,56 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from td_gui import Ui_TapeDriveWindow
-
 import elliptec.tapedrive as td
 import elliptec
 import agilent as ag
+from PyExpLabSys.drivers.omega_cni import CNi3244_C24 as cni
+from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
-	def __init__(self):
+	def __init__(self, simulate=False):
 		super().__init__()
 		self.setupUi(self)
-		
-		#self.tapedrive = td.Tapedrive()
-		self.Field = ag.MagneticField()
-		self.psus = self.Field.psus
+		self.sim = simulate
+		self.i=0
+		self.mySerial = ComSerial(sim=simulate)
+		self.mySerial.QuerySetupGUI()   
+		self.mySerial.QueryRefreshGUI()
 
-		#self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
-		# Set default stepsize
-		#self.tapedrive.motor.set_('stepsize', 
-			#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
+		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
+		exitAction.setShortcut('Ctrl+Q')
+		exitAction.setStatusTip('Exit/Terminate application')
+		exitAction.triggered.connect(self.close)
+		menubar = self.menuBar
+		menubar.setNativeMenuBar(False)
+		fileMenu = menubar.addMenu('&File')
+		fileMenu.addAction(exitAction)
+
+		#ports = serialPorts()
+		oven_port = '/dev/ttyUSB0'
+		laser_port = '/dev/ttyUSB1'
+		laser_baud = '9600'
+		laser_add = '6'
+
+		if simulate==False:
+			self.tapedrive = td.Tapedrive()
+			self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
+			# Set default stepsize
+			self.tapedrive.motor.set_('stepsize', 
+				self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
+			self.oven = cni(oven_port)
+			print("Start connection to laser port.")
+			self.mySerial.SetComPort(laser_port)
+			self.mySerial.SetComSpeed(laser_baud)
+			self.mySerial.ConnectPort()
+			self.mySerial.SetComAddress(laser_add)
+			print("Start connection to laser device.")
+		
+		self.Field = ag.MagneticField(simulate=simulate)
+		self.psus = self.Field.psus
 		
 		self.btnForward.clicked.connect(self.forward)
-		#self.btnForward.clicked.connect(self.absolute)
+		# self.btnForward.clicked.connect(self.absolute)
 		self.btnBackward.clicked.connect(self.backward)
 		self.btnHome.clicked.connect(self.home)
 
@@ -39,26 +68,56 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.oventog.toggled.connect(self.oventoggle)
 		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
 		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
+		self.lasOut.clicked.connect(self.lasRamp)
+		
+		self.timer = QtCore.QTimer()
+		self.timer.setInterval(1000)
+		self.timer.timeout.connect(self.recurring_timer)
+		self.timer.start()
+
+		self.lasint = 250
+		self.ramptimer = QtCore.QTimer()
+		self.ramptimer.setInterval(self.lasint)
+		self.ramptimer.timeout.connect(self.ramptimeout)
+		self.lasprev = 0
+		self.lasdelta = 0.1 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
+		self.failflag = 0
 
 	def forward(self):
-		pos = self.tapedrive.motor.do_('forward')
-		if pos != 420:
-			self.absCoords.setValue(pos)
+		if self.sim == False:
+			pos = self.tapedrive.motor.do_('forward')
+			if pos != 420:
+				self.absCoords.setValue(pos)
+		else:
+			oldVal = self.absCoords.value()
+			step = self.spinBox.value()
+			self.absCoords.setValue((oldVal + step)%360)
 
 	def backward(self):
-		pos = self.tapedrive.motor.do_('backward')
-		if pos != 420:
-			self.absCoords.setValue(pos)
+		if self.sim == False:
+			pos = self.tapedrive.motor.do_('backward')
+			if pos != 420:
+				self.absCoords.setValue(pos)
+		else:
+			oldVal = self.absCoords.value()
+			step = self.spinBox.value()
+			self.absCoords.setValue((oldVal - step)%360)
 
 	def absolute(self):
-		pos = self.tapedrive.motor.do_('absolute', data=self.tapedrive.motor.deg_to_hex(self.spinBox.value()))
-		if pos != 420:
-			self.absCoords.setValue(pos)
+		if self.sim == False:
+			pos = self.tapedrive.motor.do_('absolute', data=self.tapedrive.motor.deg_to_hex(self.spinBox.value()))
+			if pos != 420:
+				self.absCoords.setValue(pos)
+		else:
+			self.absCoords.setValue(self.spinBox.value())
 
 	def home(self):
-		pos = self.tapedrive.motor.do_('home')
-		if pos != 420:
-			self.absCoords.setValue(pos)
+		if self.sim == False:
+			pos = self.tapedrive.motor.do_('home')
+			if pos != 420:
+				self.absCoords.setValue(pos)
+		else:
+			self.absCoords.setValue(0)
 
 	def on_slider_drag(self):
 		val = self.verticalSlider.value()
@@ -67,20 +126,33 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def on_spin_box(self):
 		val = self.spinBox.value()
 		self.verticalSlider.setValue(val)
-		cmd_val = self.tapedrive.motor.deg_to_hex(val)
-		#print(cmd_val)
-		self.tapedrive.motor.set_('stepsize', cmd_val)
-		self.tapedrive.motor.get_('stepsize')
+		if self.sim == False:
+			cmd_val = self.tapedrive.motor.deg_to_hex(val)
+			#print(cmd_val)
+			self.tapedrive.motor.set_('stepsize', cmd_val)
+			self.tapedrive.motor.get_('stepsize')
 
 	def on_ps1_box(self):
 		psu = self.Field.psus[0].psu
 		val = self.ps1spinBox.value()
 		psu.outputs[0].configure_current_limit('regulate', val)
+		psu.outputs[0].current_limit = val
+		
+		#if psu.outputs[0].query_output_state(state='constant_current'):
+		print("Main field set to {:3.2f}A with constant current.".format(val))
+		#else:
+			#print("Main field set to {:3.2f}A with constant voltage.".format(val))
 
 	def on_ps2_box(self):
 		psu = self.Field.psus[1].psu
 		val = self.ps2spinBox.value()
 		psu.outputs[0].configure_current_limit('regulate', val)
+		psu.outputs[0].current_limit = val
+
+		#if psu.outputs[0].query_output_state(state='constant_current'):
+		print("Compensation field set to {:3.2f}A with constant current.".format(val))
+		#else:
+			#print("Compensation field set to {:3.2f}A with constant voltage.".format(val))
 
 	def ps1enable(self):
 		psu = self.Field.psus[0].psu
@@ -133,6 +205,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ovenspinBox.setStyleSheet("color: red;")
 			self.cellreadout.setStyleSheet("color: lightgrey;")
 			self.ovenreadout.setStyleSheet("color: red;")
+			print("Oven wall setpoint being used.")
 			# Toggle thermocouple relay back to oven wall
 			# Set heater setpoint to the value at self.ovenspinBox
 
@@ -142,28 +215,122 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.cellspinBox.setStyleSheet("color: red;")
 			self.ovenreadout.setStyleSheet("color: lightgrey;")
 			self.cellreadout.setStyleSheet("color: red;")
+			print("Cell wall setpoint being used.")
 			# Toggle thermocouple relay back to cell wall
 			# Set heater setpoint to the value at self.cellspinBox
 
 	def ovensetpoint(self):
 		if self.oventog.isChecked():
 			# Change heater setpoint to new value at self.ovenspinBox
-			setpoint = self.ovenspinBox.value()
+			if self.sim == False:
+				setpoint = self.ovenspinBox.value()
+				self.oven.command('rw' + str(int(setpoint)))
 
 	def cellsetpoint(self):
 		if not self.oventog.isChecked():
 			# Change heater setpoint to new value at self.cellspinBox
-			setpoint = self.cellspinBox.value()
+			if self.sim == False:
+				setpoint = self.cellspinBox.value()
+				self.oven.command('rw' + str(int(setpoint)))
+
+	def lasRamp(self):
+		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
+		if self.ramptimer.isActive():
+			self.ramptimer.stop()
+		if not self.mySerial.QueryOUT():
+			self.mySerial.SetOutputON()
+		# Begin ramping laser
+		self.failflag = 0
+		self.ramptimer.start()
+		print('Laser ramping to {:4.2f}A at {:4.2f}A/s.'.format(self.lasspinBox.value(), self.rampspinBox.value()))
+		self.anim.start()
+
+	def ramptimeout(self):
+		self.mySerial.QuerySTT()
+		self.lasreadout.setValue(self.mySerial.GenData.MC)
+		# Once 10 failures to ramp have been achieved, stop timer and report failure.
+		if self.failflag >= 10:
+			print("Ramp request timeout.")
+			self.ramptimer.stop()
+		# Otherwise continue to attempt to ramp
+		else:
+			# if current laser readout is within allowable tolerance of previous command...
+			if abs(self.mySerial.GenData.MC - self.lasprev) < self.lasdelta:
+				# check if current laser readout is within tolerance of overall setpoint
+				if abs(self.mySerial.GenData.MC - self.lasspinBox.value()) > self.lasdelta:
+					# if not check if the difference in current value and setpoint is less than allowable change for 
+					# given maximum ramp rate
+					dif = self.lasspinBox.value()-self.mySerial.GenData.MC
+					if abs(dif) < self.rampspinBox.value()/(1000/self.lasint):
+						# if ramp rate not exceeded, set power supply current to desired setpoint
+						if self.mySerial.SetCurrent(self.lasspinBox.value()):
+							if not self.failflag > 1:
+								print("Final ramp setting applied.")
+							self.lasprev = self.lasspinBox.value()
+						else:
+							if not self.failflag > 1:
+								print("Failed to continue ramping.")
+							self.failflag += 1
+					else:
+						# if ramp rate would have been exceeded, change the current value by the maximum allowable 
+						# amount for the given ramp rate
+						if self.mySerial.GenData.MC > self.lasspinBox.value():
+							if not self.mySerial.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
+								if not self.failflag > 1:
+									print("Failed to continue ramping.")
+								self.failflag += 1
+							else:
+								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
+						else:
+							if not self.mySerial.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
+								if not self.failflag > 1:
+									print("Failed to continue ramping.")
+								self.failflag += 1
+							else:
+								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
+				else:
+					# desired current setting reached
+					self.lasprev = self.mySerial.GenData.MC
+					self.ramptimer.stop()
+					if self.mySerial.GenData.MC < self.lasdelta:
+						if self.mySerial.SetOutputOFF():
+							print("Laser turned off.")
+						else:
+							print("Laser failed to turn off.")
+					else:
+						print("Desired laser current reached.")
+			# else wait for current to stabilize to previous laser setting before updating current setpoint
 
 	def on_slider_release(self):
 		val = self.verticalSlider.value()
-		cmd_val = self.tapedrive.motor.deg_to_hex(val)
-		#print(cmd_val)
-		self.tapedrive.motor.set_('stepsize', cmd_val)
-		self.tapedrive.motor.get_('stepsize')
+		if self.sim==False:
+			cmd_val = self.tapedrive.motor.deg_to_hex(val)
+			#print(cmd_val)
+			self.tapedrive.motor.set_('stepsize', cmd_val)
+			self.tapedrive.motor.get_('stepsize')
 
 	def home_button_toggle(self):
 		self.btnHome.setEnabled(self.homeEnable.isChecked())
+
+	def recurring_timer(self):
+		# Update laser current readout
+		# self.lasReadout.setValue(self.las.value())
+
+		# Update photodiode readouts
+		# self.pdreadout.setValue(self.pds[0].value())
+		# self.pd2readout.setValue(self.pds[1].value())
+
+		# Update oven readout (cell/wall)
+		if self.oventog.isChecked(): 
+			# self.ovenreadout.setValue(self.oven.read_temperature())
+			self.ovenreadout.setValue(self.i)
+
+		else:
+			# self.cellreadout.setValue(self.oven.read_temperature())
+			self.cellreadout.setValue(self.i)
+		
+		self.i += 1
+
 
 	def closeEvent(self, event):
 		# here you can terminate your threads and do other stuff
@@ -172,17 +339,25 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			for output in psu.psu.outputs:
 				output.enabled = True
 			psu.psu.close()
+			
+		# close connection to omega controller
+		if self.sim == False:
+			self.oven.close()
+
 		# and afterwards call the closeEvent of the super-class
 		super(QtWidgets.QMainWindow, self).closeEvent(event)
 		
 
-
 if __name__ == '__main__':
 	import sys
 	app = QtWidgets.QApplication(sys.argv)
-	tdgui = mainProgram()
+	
+	if len(sys.argv)>1:
+		if sys.argv[1] == 'sim':
+			tdgui = mainProgram(simulate=True)
+		else:
+			tdgui = mainProgram()
+	else:
+		tdgui = mainProgram()
 	tdgui.show()
 	sys.exit(app.exec_())
-
-
-
