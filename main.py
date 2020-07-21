@@ -29,7 +29,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
-		#ports = serialPorts()
 		oven_port = '/dev/ttyUSB0'
 		laser_port = '/dev/ttyUSB1'
 		laser_baud = '9600'
@@ -49,6 +48,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.mySerial.SetComAddress(laser_add)
 			print("Start connection to laser device.")
 		
+		#self.Field = ag.MagneticField(simulate=False)
 		self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
 		
@@ -237,8 +237,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
 		if self.ramptimer.isActive():
 			self.ramptimer.stop()
-		if not self.mySerial.QueryOUT():
-			self.mySerial.SetOutputON()
+		if self.sim==False:
+			if not self.mySerial.QueryOUT():
+				self.mySerial.SetOutputON()
 		# Begin ramping laser
 		self.failflag = 0
 		self.ramptimer.start()
@@ -246,8 +247,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.anim.start()
 
 	def ramptimeout(self):
-		self.mySerial.QuerySTT()
-		self.lasreadout.setValue(self.mySerial.GenData.MC)
+		if self.sim==False:
+			self.mySerial.QuerySTT()
+			self.lasreadout.setValue(self.mySerial.GenData.MC)
+		else:
+			self.lasreadout.setValue(self.lasprev)
+			self.mySerial.GenData.MC = self.lasprev
 		# Once 10 failures to ramp have been achieved, stop timer and report failure.
 		if self.failflag >= 10:
 			print("Ramp request timeout.")
@@ -316,6 +321,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# Update laser current readout
 		# self.lasReadout.setValue(self.las.value())
 
+		#Update power supply readouts
+		if self.sim==False:
+			self.ps1readspinBox = psus[0].psu.output[0].measure('current')
+			self.ps2readspinBox = psus[1].psu.output[0].measure('current')
+
 		# Update photodiode readouts
 		# self.pdreadout.setValue(self.pds[0].value())
 		# self.pd2readout.setValue(self.pds[1].value())
@@ -337,7 +347,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# turn off all power supplies
 		for psu in self.psus:
 			for output in psu.psu.outputs:
-				output.enabled = True
+				output.enabled = False
 			psu.psu.close()
 			
 		# close connection to omega controller
