@@ -51,8 +51,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.mySerial.ConnectDevice()
 			print("Start connection to laser device.")
 		
-		self.Field = ag.MagneticField(simulate=True)
-		#self.Field = ag.MagneticField(simulate=simulate)
+		#self.Field = ag.MagneticField(simulate=True)
+		self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
 		
 		self.btnForward.clicked.connect(self.forward)
@@ -338,9 +338,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# self.lasReadout.setValue(self.las.value())
 
 		#Update power supply readouts
-		#if self.sim==False:
-			#self.ps1readspinBox = psus[0].psu.output[0].measure('current')
-			#self.ps2readspinBox = psus[1].psu.output[0].measure('current')
+		if self.sim==False:
+			self.ps1readspinBox = psus[0].psu.output[0].measure('current')
+			self.ps2readspinBox = psus[1].psu.output[0].measure('current')
 
 		# Update photodiode readouts
 		# self.pdreadout.setValue(self.pds[0].value())
