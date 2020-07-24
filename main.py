@@ -29,27 +29,30 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
-		#ports = serialPorts()
 		oven_port = '/dev/ttyUSB0'
-		laser_port = '/dev/ttyUSB1'
+		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
 
 		if simulate==False:
-			self.tapedrive = td.Tapedrive()
-			self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
+			#self.tapedrive = td.Tapedrive()
+			#self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
 			# Set default stepsize
-			self.tapedrive.motor.set_('stepsize', 
-				self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
-			self.oven = cni(oven_port)
+			#self.tapedrive.motor.set_('stepsize', 
+				#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
+			#self.oven = cni(oven_port)
 			print("Start connection to laser port.")
 			self.mySerial.SetComPort(laser_port)
 			self.mySerial.SetComSpeed(laser_baud)
-			self.mySerial.ConnectPort()
 			self.mySerial.SetComAddress(laser_add)
+			print("Connecting to port.")
+			self.mySerial.ConnectPort()
+			print("Connecting to device.")
+			self.mySerial.ConnectDevice()
 			print("Start connection to laser device.")
 		
-		self.Field = ag.MagneticField(simulate=simulate)
+		self.Field = ag.MagneticField(simulate=True)
+		#self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
 		
 		self.btnForward.clicked.connect(self.forward)
@@ -75,12 +78,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
-		self.lasint = 250
+		self.lasint = 1000
 		self.ramptimer = QtCore.QTimer()
 		self.ramptimer.setInterval(self.lasint)
 		self.ramptimer.timeout.connect(self.ramptimeout)
 		self.lasprev = 0
-		self.lasdelta = 0.1 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
+		self.lasdelta = 0.01 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
 		self.failflag = 0
 
 	def forward(self):
@@ -237,8 +240,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
 		if self.ramptimer.isActive():
 			self.ramptimer.stop()
-		if not self.mySerial.QueryOUT():
-			self.mySerial.SetOutputON()
+		if self.sim==False:
+			if not self.mySerial.QueryOUT():
+				self.mySerial.SetOutputON()
 		# Begin ramping laser
 		self.failflag = 0
 		self.ramptimer.start()
@@ -246,57 +250,74 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.anim.start()
 
 	def ramptimeout(self):
-		self.mySerial.QuerySTT()
-		self.lasreadout.setValue(self.mySerial.GenData.MC)
-		# Once 10 failures to ramp have been achieved, stop timer and report failure.
+		if self.sim==False:
+			self.mySerial.QuerySTT()
+			self.lasreadout.setValue(self.mySerial.GenData.MC)
+			lasval = self.mySerial.GenData.MC
+		else:
+			self.lasreadout.setValue(self.lasprev)
+			lasval = self.lasprev
+		# Once 10 failures to ramp have occurred, stop timer and report failure.
 		if self.failflag >= 10:
 			print("Ramp request timeout.")
 			self.ramptimer.stop()
 		# Otherwise continue to attempt to ramp
 		else:
 			# if current laser readout is within allowable tolerance of previous command...
-			if abs(self.mySerial.GenData.MC - self.lasprev) < self.lasdelta:
+			if abs(lasval - self.lasprev) < self.lasdelta:
 				# check if current laser readout is within tolerance of overall setpoint
-				if abs(self.mySerial.GenData.MC - self.lasspinBox.value()) > self.lasdelta:
+				if abs(lasval - self.lasspinBox.value()) > self.lasdelta:
 					# if not check if the difference in current value and setpoint is less than allowable change for 
 					# given maximum ramp rate
-					dif = self.lasspinBox.value()-self.mySerial.GenData.MC
+					dif = self.lasspinBox.value()-lasval
 					if abs(dif) < self.rampspinBox.value()/(1000/self.lasint):
 						# if ramp rate not exceeded, set power supply current to desired setpoint
-						if self.mySerial.SetCurrent(self.lasspinBox.value()):
-							if not self.failflag > 1:
-								print("Final ramp setting applied.")
-							self.lasprev = self.lasspinBox.value()
+						if self.sim==False:
+							if self.mySerial.SetCurrent(self.lasspinBox.value()):
+								if not self.failflag > 1:
+									print("Final ramp setting applied.")
+								self.lasprev = self.lasspinBox.value()
+							else:
+								if not self.failflag > 1:
+									print("Failed to continue ramping.")
+								self.failflag += 1
 						else:
-							if not self.failflag > 1:
-								print("Failed to continue ramping.")
-							self.failflag += 1
+							self.lasprev = self.lasspinBox.value()
 					else:
 						# if ramp rate would have been exceeded, change the current value by the maximum allowable 
 						# amount for the given ramp rate
-						if self.mySerial.GenData.MC > self.lasspinBox.value():
-							if not self.mySerial.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
-								if not self.failflag > 1:
-									print("Failed to continue ramping.")
-								self.failflag += 1
+						if lasval > self.lasspinBox.value():
+							if self.sim==False:
+								if not self.mySerial.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
+									if not self.failflag > 1:
+										print("Failed to continue ramping.")
+									self.failflag += 1
+								else:
+									self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
 							else:
 								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
 						else:
-							if not self.mySerial.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
-								if not self.failflag > 1:
-									print("Failed to continue ramping.")
-								self.failflag += 1
+							if self.sim==False:
+								if not self.mySerial.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
+									if not self.failflag > 1:
+										print("Failed to continue ramping.")
+									self.failflag += 1
+								else:
+									self.lasprev = self.lasprev+self.rampspinBox.value()/(1000/self.lasint)
 							else:
-								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
+								self.lasprev = self.lasprev+self.rampspinBox.value()/(1000/self.lasint)
 				else:
 					# desired current setting reached
-					self.lasprev = self.mySerial.GenData.MC
+					self.lasprev = lasval
 					self.ramptimer.stop()
-					if self.mySerial.GenData.MC < self.lasdelta:
-						if self.mySerial.SetOutputOFF():
-							print("Laser turned off.")
+					if lasval < self.lasdelta:
+						if self.sim==False:
+							if self.mySerial.SetOutputOFF():
+								print("Laser turned off.")
+							else:
+								print("Laser failed to turn off.")
 						else:
-							print("Laser failed to turn off.")
+							print("Laser turned off.")
 					else:
 						print("Desired laser current reached.")
 			# else wait for current to stabilize to previous laser setting before updating current setpoint
@@ -315,6 +336,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def recurring_timer(self):
 		# Update laser current readout
 		# self.lasReadout.setValue(self.las.value())
+
+		#Update power supply readouts
+		#if self.sim==False:
+			#self.ps1readspinBox = psus[0].psu.output[0].measure('current')
+			#self.ps2readspinBox = psus[1].psu.output[0].measure('current')
 
 		# Update photodiode readouts
 		# self.pdreadout.setValue(self.pds[0].value())
@@ -337,7 +363,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# turn off all power supplies
 		for psu in self.psus:
 			for output in psu.psu.outputs:
-				output.enabled = True
+				output.enabled = False
 			psu.psu.close()
 			
 		# close connection to omega controller

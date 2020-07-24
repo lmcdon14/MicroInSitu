@@ -8,13 +8,12 @@ import sys
 def find_ports():
 	avail_ports = []
 	for port in lp.comports():
-		if port.serial_number:
-			#print(port.serial_number)
-			try:
-				p = s.Serial(port.device)
-				p.close()
-				avail_ports.append(port)
-			except (OSError, s.SerialException):
-				print('%s unavailable.\n' % port.device)
-				#pass
+		print(port)
+		try:
+			p = s.Serial(port.device)
+			p.close()
+			avail_ports.append(port)
+		except (OSError, s.SerialException):
+			print('%s unavailable.\n' % port.device)
+			#pass
 	return avail_ports
