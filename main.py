@@ -7,8 +7,13 @@ from td_gui import Ui_TapeDriveWindow
 import elliptec.tapedrive as td
 import elliptec
 import agilent as ag
+import serial
 from PyExpLabSys.drivers.omega_cni import CNi3244_C24 as cni
 from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
+import instruments as ik
+from instruments.abstract_instruments import FunctionGenerator
+import quantities as pq
+import math
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -16,9 +21,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.setupUi(self)
 		self.sim = simulate
 		self.i=0
-		self.mySerial = ComSerial(sim=simulate)
-		self.mySerial.QuerySetupGUI()   
-		self.mySerial.QueryRefreshGUI()
+		self.las = '770'
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -29,10 +32,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
-		oven_port = '/dev/ttyUSB0'
+		oven_port = 'COM9'
 		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
+		func_gen_port = 'COM10'
 
 		if simulate==False:
 			#self.tapedrive = td.Tapedrive()
@@ -41,15 +45,26 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			#self.tapedrive.motor.set_('stepsize', 
 				#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
 			#self.oven = cni(oven_port)
-			print("Start connection to laser port.")
-			self.mySerial.SetComPort(laser_port)
-			self.mySerial.SetComSpeed(laser_baud)
-			self.mySerial.SetComAddress(laser_add)
-			print("Connecting to port.")
-			self.mySerial.ConnectPort()
-			print("Connecting to device.")
-			self.mySerial.ConnectDevice()
-			print("Start connection to laser device.")
+			
+			self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
+			self.srs.function = self.srs.Function.arbitrary
+			self.srs.sendcmd('BCNT 1')
+			self.srs.sendcmd('OFFS 0')
+			self.srs.sendcmd('MENA 1')
+			self.srs.sendcmd('MTYP 2')
+
+			if self.laser == '770':
+				self.lasSer = ComSerial(sim=simulate)
+				self.lasSer.QuerySetupGUI()   
+				self.lasSer.QueryRefreshGUI()
+				self.lasSer.SetComPort(laser_port)
+				self.lasSer.SetComSpeed(laser_baud)
+				self.lasSer.SetComAddress(laser_add)
+				self.lasSer.ConnectPort()
+				self.lasSer.ConnectDevice()
+			else:
+				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
+					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
 		
 		#self.Field = ag.MagneticField(simulate=True)
 		self.Field = ag.MagneticField(simulate=simulate)
@@ -72,6 +87,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
 		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
 		self.lasOut.clicked.connect(self.lasRamp)
+		self.AFPOut.clicked.connect(self.AFP)
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(1000)
@@ -236,13 +252,47 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				setpoint = self.cellspinBox.value()
 				self.oven.command('rw' + str(int(setpoint)))
 
+	def AFP(self):
+		self.animAFP.start()
+		self.srs.trigger()
+	
+	def AFPSendWvfm(self):
+		RFamp = 2*self.RFampspinBox.value()
+		self.srs._set_amplitude_(RFamp,FunctionGenerator.VoltageMode.peak_to_peak)
+		FsweepRate = 1000*self.SweepspinBox.value()
+		Ffwhm = self.FWHMspinBox.value()
+		Fcent = self.FcentspinBox.value()
+		Fmin = 0.65*Fcent
+		Fmax = 1.5*Fcent
+		npnts = 10000
+		totaltime = (Fmax-Fmin)/FsweepRate
+		tpnt = npnts/totaltime
+		div = int(tpnt/(0.3*10^(-6)))
+		self.srs.sendcmd('AMRT {}'.format(div))
+
+		self.srs.sendcmd('AMOD? 10000')
+		
+		checksum = 0
+		AFPOutWave = [0] * (npnts + 1)
+		for x in range (npnts):
+			# Freq = Fmin+FsweepRate*x
+			# given code showed "=" instead of "+" below...
+			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )       
+			# Note factor of 2 in rate to keep peak in correct place
+			val = int(32767*math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 ) * math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)+0.5)
+			AFPOutWave[x] = '{0:b}'.format(val)
+			checksum = checksum + val
+
+		AFPOutWave[npnts] = '{0:b}'.format(checksum)
+		self.srs.sendcmd(",".join(AFPOutWave))
+
 	def lasRamp(self):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
 		if self.ramptimer.isActive():
 			self.ramptimer.stop()
 		if self.sim==False:
-			if not self.mySerial.QueryOUT():
-				self.mySerial.SetOutputON()
+			if not self.lasSer.QueryOUT():
+				self.lasSer.SetOutputON()
 		# Begin ramping laser
 		self.failflag = 0
 		self.ramptimer.start()
@@ -251,9 +301,15 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def ramptimeout(self):
 		if self.sim==False:
-			self.mySerial.QuerySTT()
-			self.lasreadout.setValue(self.mySerial.GenData.MC)
-			lasval = self.mySerial.GenData.MC
+			if self.las == '770':
+				self.mySerial.QuerySTT()
+				self.lasreadout.setValue(self.mySerial.GenData.MC)
+				lasval = self.mySerial.GenData.MC
+			else:
+				self.mySerial.write(('I\r').encode())
+				test=self.mySerial.readline()
+				lasval=float(test.decode("utf-8"))
+				self.lasreadout.setValue(lasval)
 		else:
 			self.lasreadout.setValue(self.lasprev)
 			lasval = self.lasprev
@@ -339,8 +395,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 		#Update power supply readouts
 		if self.sim==False:
-			self.ps1readspinBox = psus[0].psu.output[0].measure('current')
-			self.ps2readspinBox = psus[1].psu.output[0].measure('current')
+			self.ps1readspinBox = self.psus[0].psu.output[0].measure('current')
+			self.ps2readspinBox = self.psus[1].psu.output[0].measure('current')
 
 		# Update photodiode readouts
 		# self.pdreadout.setValue(self.pds[0].value())
