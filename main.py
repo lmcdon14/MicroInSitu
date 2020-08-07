@@ -14,6 +14,7 @@ import instruments as ik
 from instruments.abstract_instruments import FunctionGenerator
 import quantities as pq
 import math
+import matplotlib.pyplot as plt
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -33,10 +34,22 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu.addAction(exitAction)
 
 		oven_port = 'COM9'
+		relay_port = 'COM10'
 		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
-		func_gen_port = 'COM10'
+		func_gen_port = 'COM8'
+
+		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
+		# self.srs.function = self.srs.Function.arbitrary
+		# self.srs.sendcmd('*TST?\n')
+		print(self.srs.read(1))
+		print(self.srs.power_on_status)
+		self.srs.sendcmd('BCNT 1\n')
+		self.srs.sendcmd('OFFS 0\n')
+		self.srs.sendcmd('MENA 0\n')
+		self.srs.sendcmd('MTYP 2\n')
+		self.srs.sendcmd('MDWF 5\n')
 
 		if simulate==False:
 			#self.tapedrive = td.Tapedrive()
@@ -45,15 +58,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			#self.tapedrive.motor.set_('stepsize', 
 				#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
 			#self.oven = cni(oven_port)
-			
-			self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
-			self.srs.function = self.srs.Function.arbitrary
-			self.srs.sendcmd('BCNT 1')
-			self.srs.sendcmd('OFFS 0')
-			self.srs.sendcmd('MENA 1')
-			self.srs.sendcmd('MTYP 2')
 
-			if self.laser == '770':
+			if self.las == '770':
 				self.lasSer = ComSerial(sim=simulate)
 				self.lasSer.QuerySetupGUI()   
 				self.lasSer.QueryRefreshGUI()
@@ -88,6 +94,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
 		self.lasOut.clicked.connect(self.lasRamp)
 		self.AFPOut.clicked.connect(self.AFP)
+		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(1000)
@@ -257,6 +264,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.srs.trigger()
 	
 	def AFPSendWvfm(self):
+		self.AFPwave.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
 		RFamp = 2*self.RFampspinBox.value()
 		self.srs._set_amplitude_(RFamp,FunctionGenerator.VoltageMode.peak_to_peak)
 		FsweepRate = 1000*self.SweepspinBox.value()
@@ -266,25 +274,42 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		Fmax = 1.5*Fcent
 		npnts = 10000
 		totaltime = (Fmax-Fmin)/FsweepRate
-		tpnt = npnts/totaltime
-		div = int(tpnt/(0.3*10^(-6)))
-		self.srs.sendcmd('AMRT {}'.format(div))
+		tpnt = totaltime/npnts
+		FsweepRate = FsweepRate*tpnt
+		print('sweeprate = {:f}'.format(FsweepRate))
+		div = int(tpnt/(0.3*math.pow(10,(-6))))
+		self.srs.sendcmd('AMRT {:d}\n'.format(div))
 
-		self.srs.sendcmd('AMOD? 10000')
-		
+		#self.srs.sendcmd('AMOD? 10000\n')
+		#while(self.srs.read(1) != '1'):
+			#True
+
 		checksum = 0
 		AFPOutWave = [0] * (npnts + 1)
+		wave = [0] * (npnts)
 		for x in range (npnts):
 			# Freq = Fmin+FsweepRate*x
 			# given code showed "=" instead of "+" below...
 			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )       
 			# Note factor of 2 in rate to keep peak in correct place
-			val = int(32767*math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 ) * math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)+0.5)
-			AFPOutWave[x] = '{0:b}'.format(val)
-			checksum = checksum + val
+			val = 32767*math.exp( -1* (math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2)) ) ) * math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)+0.5
+			# print(math.exp( -1* (math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2)) ) ))
+			AFPOutWave[x] = '{:016b}'.format(int(val))
+			wave[x] = val
+			# print(AFPOutWave[x])
+			checksum = checksum + int(val)
 
-		AFPOutWave[npnts] = '{0:b}'.format(checksum)
-		self.srs.sendcmd(",".join(AFPOutWave))
+		plt.plot(range(npnts), wave, '-o')
+		plt.title('Scatter plot pythonspot.com')
+		plt.xlabel('x')
+		plt.ylabel('y')
+		plt.show()
+
+		AFPOutWave[npnts] = '{:016b}'.format(checksum)
+		#print(checksum)
+		#print(",".join(AFPOutWave))
+		#self.srs.sendcmd(",".join(AFPOutWave))
+		self.AFPwave.setStyleSheet("background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;") 
 
 	def lasRamp(self):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
