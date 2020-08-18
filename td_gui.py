@@ -425,8 +425,8 @@ class Ui_TapeDriveWindow(object):
         self.FWHMspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.FWHMspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.FWHMspinBox.setMinimum(0.0)
-        self.FWHMspinBox.setMaximum(500)
-        self.FWHMspinBox.setProperty("value", 200)
+        self.FWHMspinBox.setMaximum(20000)
+        self.FWHMspinBox.setProperty("value", 6000)
         self.FWHMspinBox.setObjectName("FWHMspinBox")
 
         # AFP Sweeprate
