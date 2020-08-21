@@ -14,6 +14,12 @@ import instruments as ik
 from instruments.abstract_instruments import FunctionGenerator
 import quantities as pq
 import math
+import matplotlib.pyplot as plt
+import array
+import numpy as np
+import nidaqmx
+from nidaqmx.stream_writers import AnalogSingleChannelWriter
+system = nidaqmx.system.system.System.local()
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -22,6 +28,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.sim = simulate
 		self.i=0
 		self.las = '770'
+		self.task = None
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -33,27 +40,41 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu.addAction(exitAction)
 
 		oven_port = 'COM9'
+		relay_port = 'COM10'
 		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
-		func_gen_port = 'COM10'
+		#func_gen_port = 'COM8'
+
+		"""
+		Function Generator Code
+
+		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
+		self.srs.sendcmd('BCNT 1')
+		self.srs.sendcmd('OFFS 0')
+		self.srs.sendcmd('MENA 0')
+		self.srs.sendcmd('MTYP 5')
+		#self.srs.sendcmd('MDWF 5')
+		self.srs.sendcmd('DPTH -100')
+		"""
 
 		if simulate==False:
-			#self.tapedrive = td.Tapedrive()
-			#self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
-			# Set default stepsize
-			#self.tapedrive.motor.set_('stepsize', 
-				#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
-			#self.oven = cni(oven_port)
-			
-			self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
-			self.srs.function = self.srs.Function.arbitrary
-			self.srs.sendcmd('BCNT 1')
-			self.srs.sendcmd('OFFS 0')
-			self.srs.sendcmd('MENA 1')
-			self.srs.sendcmd('MTYP 2')
+			#Connect rotation mount(s)
+			self.tapedrive = td.Tapedrive()
+			self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
+			self.tapedrive.motor.set_('stepsize', 
+				self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
 
-			if self.laser == '770':
+			#Connect Omega controller for oven
+			self.oven = cni(oven_port)
+
+			#Connect DAQ board
+			for device in system.devices:
+				print(device)
+			self.daq = system.devices[0]
+
+			#Connect Laser
+			if self.las == '770':
 				self.lasSer = ComSerial(sim=simulate)
 				self.lasSer.QuerySetupGUI()   
 				self.lasSer.QueryRefreshGUI()
@@ -66,6 +87,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
 					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
 		
+		#Connect Power Supplies
 		#self.Field = ag.MagneticField(simulate=True)
 		self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
@@ -74,20 +96,24 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# self.btnForward.clicked.connect(self.absolute)
 		self.btnBackward.clicked.connect(self.backward)
 		self.btnHome.clicked.connect(self.home)
-
 		self.verticalSlider.valueChanged.connect(self.on_slider_drag)
 		self.verticalSlider.sliderReleased.connect(self.on_slider_release)
 		self.spinBox.valueChanged.connect(self.on_spin_box)
+		self.homeEnable.toggled.connect(self.home_button_toggle)
+		
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
-		self.homeEnable.toggled.connect(self.home_button_toggle)
 		self.ps1Out.toggled.connect(self.ps1enable)
 		self.ps2Out.toggled.connect(self.ps2enable)
+
 		self.oventog.toggled.connect(self.oventoggle)
 		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
 		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
+
 		self.lasOut.clicked.connect(self.lasRamp)
+		
 		self.AFPOut.clicked.connect(self.AFP)
+		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(1000)
@@ -254,37 +280,131 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def AFP(self):
 		self.animAFP.start()
-		self.srs.trigger()
+		print('Output triggered')
+		#task = system.tasks[0].load()
+		#writer = AnalogSingleChannelWriter(self.task.out_stream, auto_start=False)
+		#print(writer.write_many_sample(self.data))
+		self.task.start()
+		self.task.wait_until_done()
+		self.task.stop()
+		print('Task complete')
+
+		#Function generator code
+		#self.srs.trigger()
 	
 	def AFPSendWvfm(self):
+		self.AFPwave.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+		RFamp = self.RFampspinBox.value()
+		FsweepRate = self.SweepspinBox.value()/1000
+		Ffwhm = self.FWHMspinBox.value()
+		Fcent = self.FcentspinBox.value()
+		Fmin = 0.55*Fcent
+		Fmax = 1.5*Fcent
+		totaltime = (Fmax-Fmin)/(FsweepRate*1e6)
+		npnts = int(totaltime*1e6+0.5)
+		
+		#data = np.zeros(npnts, dtype='<i2')
+		data = np.zeros(npnts)
+		for x in range (npnts):
+			# Freq = Fmin+FsweepRate*x
+			# given code showed "=" instead of "+" below...
+			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+			# Note factor of 2 in rate to keep peak in correct place
+			#val = int((32676*RFamp/10*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x))+0.5)
+			val = RFamp*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
+			data[x] = val
+			
+		self.data = data
+
+		if (self.plotEnable.isChecked()):
+			plt.clf()
+			plt.close()
+			plt.plot(range(npnts), data, '-o')
+			plt.title('AFP Function')
+			plt.xlabel('Time (us)')
+			plt.ylabel('Voltage (V)')
+			plt.show()
+			print(np.amin(data), np.amax(data))
+		
+		if (self.task != None):
+			self.task.close()
+		self.task = nidaqmx.task.Task()
+		self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
+		self.task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
+		writer = AnalogSingleChannelWriter(self.task.out_stream, auto_start=False)
+		print(writer.write_many_sample(data))
+			
+		#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
+		
+		self.AFPwave.setStyleSheet("background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;")
+
+	def AFPSendWvfm_funcgen(self):
+		self.AFPwave.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
 		RFamp = 2*self.RFampspinBox.value()
 		self.srs._set_amplitude_(RFamp,FunctionGenerator.VoltageMode.peak_to_peak)
 		FsweepRate = 1000*self.SweepspinBox.value()
 		Ffwhm = self.FWHMspinBox.value()
 		Fcent = self.FcentspinBox.value()
-		Fmin = 0.65*Fcent
+		Fmin = 0.55*Fcent
 		Fmax = 1.5*Fcent
-		npnts = 10000
 		totaltime = (Fmax-Fmin)/FsweepRate
-		tpnt = npnts/totaltime
-		div = int(tpnt/(0.3*10^(-6)))
-		self.srs.sendcmd('AMRT {}'.format(div))
+		npnts = 16001
+		og = npnts
+		checksum = 32768
+		while(abs(checksum) > 32767 or npnts < og-100 or npnts < 2):
+			npnts = npnts-1
+			tpnt = totaltime/npnts
+			act_freq = 1/tpnt
+			print(tpnt, act_freq, int(act_freq+0.5))
+			FsweepR = FsweepRate*tpnt # sweeprate per point (not per second)
+			# print('sweeprate = {:f}'.format(FsweepRate))
+			#div = int(tpnt/(0.3*math.pow(10,(-6))))
 
-		self.srs.sendcmd('AMOD? 10000')
+			checksum = 0
+			data = [0] * (npnts + 1)
+			for x in range (npnts):
+				# Freq = Fmin+FsweepRate*x
+				# given code showed "=" instead of "+" below...
+				# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+				# Note factor of 2 in rate to keep peak in correct place
+				val = 2047*math.exp( -1* (math.pow(((Fmin + FsweepR*x)-Fcent),2)/(math.pow(Ffwhm,2)) ) ) * math.sin(2*math.pi*(Fmin +0.5*FsweepR*x)*x)+0.5
+				#val = 2047*math.sin(2/100*math.pi*x)+0.5
+				data[x] = int(val)
+				checksum = checksum + int(val)
+			data[npnts] = checksum
+			print('{:d}, {:d}'.format(npnts,checksum))
+
+		self.srs.sendcmd('FSMP {:d}'.format(int(act_freq+0.5)))
+		#self.srs.sendcmd('AMRT {:d}'.format(div))
+
+		self.srs.sendcmd('LDWF? 0,{:d}'.format(npnts))
+		i=0
+		while(self.srs.read(1) != '1' or i>=5):
+			True
+			i=i+1
+			if i==1:
+				print('Read failed {:d} time'.format(i))
+			else:
+				print('Read failed {:d} times'.format(i))
+
+		plt.plot(range(npnts), data[0:npnts], '-o')
+		plt.title('AFP Function')
+		plt.xlabel('nth point')
+		plt.ylabel('magnitude (-32676,32676)')
+		plt.show()
+
+		#print(data[npnts])
 		
-		checksum = 0
-		AFPOutWave = [0] * (npnts + 1)
-		for x in range (npnts):
-			# Freq = Fmin+FsweepRate*x
-			# given code showed "=" instead of "+" below...
-			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )       
-			# Note factor of 2 in rate to keep peak in correct place
-			val = int(32767*math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 ) * math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)+0.5)
-			AFPOutWave[x] = '{0:b}'.format(val)
-			checksum = checksum + val
+		if (i<5):
+			for pt in range(npnts+1):
+				if (abs(data[pt]) > 32767):
+					print('Load range error!')
+				self.srs.write((data[pt]).to_bytes(2, 'little', signed=True), bin=True)
 
-		AFPOutWave[npnts] = '{0:b}'.format(checksum)
-		self.srs.sendcmd(",".join(AFPOutWave))
+			self.srs.sendcmd('MENA 1')
+		else:
+			print('Function loading failed.')
+		self.AFPwave.setStyleSheet("background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;") 
 
 	def lasRamp(self):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint

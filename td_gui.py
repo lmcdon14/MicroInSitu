@@ -307,6 +307,12 @@ class Ui_TapeDriveWindow(object):
         self.label_afp4.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_afp4.setAlignment(QtCore.Qt.AlignCenter)
         self.label_afp4.setObjectName("label_afp4")
+        # Plot Enable Label
+        self.label_plot = QtWidgets.QLabel(self.centralwidget)
+        self.label_plot.setGeometry(QtCore.QRect(567, 850, 81, 41))
+        self.label_plot.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_plot.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_plot.setObjectName("label_plot")
 
         # Power Supply Control 1
         self.ps1spinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -425,8 +431,8 @@ class Ui_TapeDriveWindow(object):
         self.FWHMspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.FWHMspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.FWHMspinBox.setMinimum(0.0)
-        self.FWHMspinBox.setMaximum(500)
-        self.FWHMspinBox.setProperty("value", 200)
+        self.FWHMspinBox.setMaximum(20000)
+        self.FWHMspinBox.setProperty("value", 6000)
         self.FWHMspinBox.setObjectName("FWHMspinBox")
 
         # AFP Sweeprate
@@ -438,7 +444,7 @@ class Ui_TapeDriveWindow(object):
         self.SweepspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.SweepspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.SweepspinBox.setMinimum(0.0)
-        self.SweepspinBox.setMaximum(250)
+        self.SweepspinBox.setMaximum(1000)
         self.SweepspinBox.setProperty("value", 100)
         self.SweepspinBox.setObjectName("SweepspinBox")
 
@@ -451,9 +457,14 @@ class Ui_TapeDriveWindow(object):
         self.RFampspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.RFampspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.RFampspinBox.setMinimum(0.0)
-        # self.RFampspinBox.setMaximum(1.0)
+        self.RFampspinBox.setMaximum(10.0)
         self.RFampspinBox.setProperty("value", 2.0)
         self.RFampspinBox.setObjectName("RFampspinBox")
+
+        # Plot enable
+        self.plotEnable = QtWidgets.QCheckBox(self.centralwidget)
+        self.plotEnable.setGeometry(QtCore.QRect(600, 890, 41, 16))
+        self.plotEnable.setObjectName("plotEnable")
 
         # Cell Wall Readout
         self.cellreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -612,6 +623,7 @@ class Ui_TapeDriveWindow(object):
         self.label_afp2.setText(_translate("TapeDriveWindow", "FWHM Frequency\n(Hz)"))
         self.label_afp3.setText(_translate("TapeDriveWindow", "Sweeprate\n(KHz/s)"))
         self.label_afp4.setText(_translate("TapeDriveWindow", "RF Amplitude\n(V)"))
+        self.label_plot.setText(_translate("TapeDriveWindow", "Plot\nEnable"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))
         self.actionQuit.setShortcut(_translate("TapeDriveWindow", "Meta+Q"))
         self.actionNothingHere.setText(_translate("TapeDriveWindow", "NothingHere"))
