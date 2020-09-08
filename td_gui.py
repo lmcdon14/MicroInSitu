@@ -78,9 +78,10 @@ class Ui_TapeDriveWindow(object):
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap("Resources/fw3.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
 
+        """
         # Move forward
         self.btnForward = QtWidgets.QPushButton(self.centralwidget)
-        self.btnForward.setGeometry(QtCore.QRect(335, 75, 101, 61))
+        self.btnForward.setGeometry(QtCore.QRect(175, 75, 101, 61))
         self.btnForward.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); border-radius: 5px;}")
         self.btnForward.setText("")
         self.btnForward.setIcon(icon1)
@@ -89,7 +90,7 @@ class Ui_TapeDriveWindow(object):
 
         # Move backward
         self.btnBackward = QtWidgets.QPushButton(self.centralwidget)
-        self.btnBackward.setGeometry(QtCore.QRect(205, 75, 101, 61))
+        self.btnBackward.setGeometry(QtCore.QRect(45, 75, 101, 61))
         self.btnBackward.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); border-radius:5px;}")
         self.btnBackward.setText("")
         self.btnBackward.setIcon(icon)
@@ -116,7 +117,7 @@ class Ui_TapeDriveWindow(object):
 
         # Step group
         self.groupBox_2 = QtWidgets.QGroupBox(self.centralwidget)
-        self.groupBox_2.setGeometry(QtCore.QRect(520, 50, 101, 151))
+        self.groupBox_2.setGeometry(QtCore.QRect(200, 50, 101, 151))
         self.groupBox_2.setObjectName("groupBox_2")
         self.verticalSlider = QtWidgets.QSlider(self.groupBox_2)
         self.verticalSlider.setGeometry(QtCore.QRect(10, 30, 21, 110))
@@ -144,25 +145,75 @@ class Ui_TapeDriveWindow(object):
         self.spinBox.setMaximum(359)
         self.spinBox.setProperty("value", 45)
         self.spinBox.setObjectName("spinBox")
+        """
 
-        # Absolute Coordinates
-        self.absCoords = QtWidgets.QSpinBox(self.centralwidget)
-        self.absCoords.setGeometry(QtCore.QRect(290, 150, 60, 40))
-        self.absCoords.setFont(font)
-        self.absCoords.setReadOnly(True)
-        self.absCoords.setAlignment(QtCore.Qt.AlignHCenter)
-        self.absCoords.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.absCoords.setMinimum(0)
-        self.absCoords.setMaximum(359)
-        self.absCoords.setProperty("value", 45)
-        self.absCoords.setObjectName("absCoords")
+        font = QtGui.QFont()
+        font.setFamily("Arial")
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+
+        self.absCoords = [None] * 2
+        self.absCoordset = [None] * 2
+
+        # HWP Absolute Coordinates
+        self.absCoords[0] = QtWidgets.QSpinBox(self.centralwidget)
+        self.absCoords[0].setGeometry(QtCore.QRect(130, 150, 60, 40))
+        self.absCoords[0].setFont(font)
+        self.absCoords[0].setReadOnly(True)
+        self.absCoords[0].setAlignment(QtCore.Qt.AlignHCenter)
+        self.absCoords[0].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.absCoords[0].setMinimum(0)
+        self.absCoords[0].setMaximum(359)
+        self.absCoords[0].setProperty("value", 45)
+        self.absCoords[0].setObjectName("absCoords1")
+
+        # HWP Absolute Coordinates Setpoint
+        self.absCoordset[0] = QtWidgets.QSpinBox(self.centralwidget)
+        self.absCoordset[0].setGeometry(QtCore.QRect(130, 100, 60, 40))
+        self.absCoordset[0].setFont(font)
+        self.absCoordset[0].setAlignment(QtCore.Qt.AlignHCenter)
+        self.absCoordset[0].setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.absCoordset[0].setKeyboardTracking(False)
+        self.absCoordset[0].setMinimum(0)
+        self.absCoordset[0].setMaximum(359)
+        self.absCoordset[0].setProperty("value", 45)
+        self.absCoordset[0].setObjectName("absCoordset1")
+
+        # QWP Absolute Coordinates
+        self.absCoords[1] = QtWidgets.QSpinBox(self.centralwidget)
+        self.absCoords[1].setGeometry(QtCore.QRect(320+130, 150, 60, 40))
+        self.absCoords[1].setFont(font)
+        self.absCoords[1].setReadOnly(True)
+        self.absCoords[1].setAlignment(QtCore.Qt.AlignHCenter)
+        self.absCoords[1].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.absCoords[1].setMinimum(0)
+        self.absCoords[1].setMaximum(359)
+        self.absCoords[1].setProperty("value", 45)
+        self.absCoords[1].setObjectName("absCoords2")
+
+        # QWP Absolute Coordinates Setpoint
+        self.absCoordset[1] = QtWidgets.QSpinBox(self.centralwidget)
+        self.absCoordset[1].setGeometry(QtCore.QRect(320+130, 100, 60, 40))
+        self.absCoordset[1].setFont(font)
+        self.absCoordset[1].setAlignment(QtCore.Qt.AlignHCenter)
+        self.absCoordset[1].setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.absCoordset[1].setKeyboardTracking(False)
+        self.absCoordset[1].setProperty("value", 45)
+        self.absCoordset[1].setObjectName("absCoordset2")
 
         # Rotation Label
         self.label_4 = QtWidgets.QLabel(self.centralwidget)
-        self.label_4.setGeometry(QtCore.QRect(10, 5, 621, 41))
+        self.label_4.setGeometry(QtCore.QRect(10, 5, 301, 41))
         self.label_4.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_4.setAlignment(QtCore.Qt.AlignCenter)
         self.label_4.setObjectName("label_4")
+        # QWP Label
+        self.label_qwp = QtWidgets.QLabel(self.centralwidget)
+        self.label_qwp.setGeometry(QtCore.QRect(330, 5, 301, 41))
+        self.label_qwp.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
+        self.label_qwp.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_qwp.setObjectName("label_qwp")
         # PS Label
         self.label_5 = QtWidgets.QLabel(self.centralwidget)
         self.label_5.setGeometry(QtCore.QRect(10, 220, 621, 41))
@@ -189,7 +240,7 @@ class Ui_TapeDriveWindow(object):
         self.label_o.setObjectName("label_o")
         # AFP
         self.label_afp = QtWidgets.QLabel(self.centralwidget)
-        self.label_afp.setGeometry(QtCore.QRect(10, 800, 621, 41))
+        self.label_afp.setGeometry(QtCore.QRect(10, 800, 400, 41))
         self.label_afp.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_afp.setAlignment(QtCore.Qt.AlignCenter)
         self.label_afp.setObjectName("label_afp")
@@ -243,10 +294,16 @@ class Ui_TapeDriveWindow(object):
         self.label_or.setObjectName("label_or")
         # Halfwave plate readout label
         self.label_hr = QtWidgets.QLabel(self.centralwidget)
-        self.label_hr.setGeometry(QtCore.QRect(260, 180, 120, 41))
+        self.label_hr.setGeometry(QtCore.QRect(100, 180, 120, 41))
         self.label_hr.setStyleSheet("QLabel {font-size: 12px; color: black; border-radius: 5px;}")
         self.label_hr.setAlignment(QtCore.Qt.AlignCenter)
         self.label_hr.setObjectName("label_hr")
+        # Quarterwave plate readout label
+        self.label_qr = QtWidgets.QLabel(self.centralwidget)
+        self.label_qr.setGeometry(QtCore.QRect(420, 180, 120, 41))
+        self.label_qr.setStyleSheet("QLabel {font-size: 12px; color: black; border-radius: 5px;}")
+        self.label_qr.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_qr.setObjectName("label_qr")
         # Laser PS Label
         self.label_lps = QtWidgets.QLabel(self.centralwidget)
         self.label_lps.setGeometry(QtCore.QRect(10, 620, 301, 41))
@@ -307,6 +364,18 @@ class Ui_TapeDriveWindow(object):
         self.label_afp4.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_afp4.setAlignment(QtCore.Qt.AlignCenter)
         self.label_afp4.setObjectName("label_afp4")
+        # AFP Timer Label
+        self.label_afptime = QtWidgets.QLabel(self.centralwidget)
+        self.label_afptime.setGeometry(QtCore.QRect(400, 800, 100, 41))
+        self.label_afptime.setStyleSheet("QLabel {font-size: 14x; color: black; border-radius: 5px;}")
+        self.label_afptime.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_afptime.setObjectName("label_afptime")
+        # Plot Enable Label
+        self.label_plot = QtWidgets.QLabel(self.centralwidget)
+        self.label_plot.setGeometry(QtCore.QRect(567, 850, 81, 41))
+        self.label_plot.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_plot.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_plot.setObjectName("label_plot")
 
         # Power Supply Control 1
         self.ps1spinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -403,6 +472,19 @@ class Ui_TapeDriveWindow(object):
         self.rampspinBox.setProperty("value", 0.1)
         self.rampspinBox.setObjectName("rampspinBox")
 
+        # AFP repeating timer spinbox
+        self.afptime = QtWidgets.QDoubleSpinBox(self.centralwidget)
+        self.afptime.setGeometry(QtCore.QRect(480, 800, 100, 41))
+        self.afptime.setFont(font)
+        self.afptime.setSingleStep(1)
+        self.afptime.setDecimals(0)
+        self.afptime.setAlignment(QtCore.Qt.AlignHCenter)
+        self.afptime.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.afptime.setMinimum(10)
+        self.afptime.setMaximum(1800)
+        self.afptime.setProperty("value", 60)
+        self.afptime.setObjectName("afptime")
+
         # AFP Center Frequency
         self.FcentspinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
         self.FcentspinBox.setGeometry(QtCore.QRect(110, 855, 100, 40))
@@ -425,8 +507,8 @@ class Ui_TapeDriveWindow(object):
         self.FWHMspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.FWHMspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.FWHMspinBox.setMinimum(0.0)
-        self.FWHMspinBox.setMaximum(500)
-        self.FWHMspinBox.setProperty("value", 200)
+        self.FWHMspinBox.setMaximum(20000)
+        self.FWHMspinBox.setProperty("value", 6000)
         self.FWHMspinBox.setObjectName("FWHMspinBox")
 
         # AFP Sweeprate
@@ -438,7 +520,7 @@ class Ui_TapeDriveWindow(object):
         self.SweepspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.SweepspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.SweepspinBox.setMinimum(0.0)
-        self.SweepspinBox.setMaximum(250)
+        self.SweepspinBox.setMaximum(1000)
         self.SweepspinBox.setProperty("value", 100)
         self.SweepspinBox.setObjectName("SweepspinBox")
 
@@ -451,9 +533,14 @@ class Ui_TapeDriveWindow(object):
         self.RFampspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.RFampspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.RFampspinBox.setMinimum(0.0)
-        # self.RFampspinBox.setMaximum(1.0)
+        self.RFampspinBox.setMaximum(10.0)
         self.RFampspinBox.setProperty("value", 2.0)
         self.RFampspinBox.setObjectName("RFampspinBox")
+
+        # Plot enable
+        self.plotEnable = QtWidgets.QCheckBox(self.centralwidget)
+        self.plotEnable.setGeometry(QtCore.QRect(600, 890, 41, 16))
+        self.plotEnable.setObjectName("plotEnable")
 
         # Cell Wall Readout
         self.cellreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -545,8 +632,9 @@ class Ui_TapeDriveWindow(object):
         self.anim.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
         self.anim.setEndValue(QtGui.QColor(0,0,0,0.5))
 
-        # AFP button
+        # AFP Button
         self.AFPOut = MyButton(self.centralwidget, font2, QtCore.QRect(480, 900, 100, 40),"AFP")
+        self.AFPOut.setEnabled(False)
         self.animAFP = QtCore.QPropertyAnimation(self.AFPOut, b"zcolor")
         self.animAFP.setDuration(750)
         self.animAFP.setLoopCount(1)
@@ -554,6 +642,15 @@ class Ui_TapeDriveWindow(object):
         self.animAFP.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
         self.animAFP.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
         self.animAFP.setEndValue(QtGui.QColor(0,0,0,0.5))
+
+        # AFP Timer Button
+        self.AFPTimerOut = QtWidgets.QPushButton(self.centralwidget)
+        self.AFPTimerOut.setGeometry(QtCore.QRect(590, 803, 40, 35))
+        self.AFPTimerOut.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
+        self.AFPTimerOut.setFont(font2)
+        self.AFPTimerOut.setCheckable(True)
+        self.AFPTimerOut.setText("Run")
+        self.AFPTimerOut.setObjectName("AFPTimerOut")
 
         # AFP Send Waveform
         self.AFPwave = QtWidgets.QPushButton(self.centralwidget)
@@ -585,14 +682,15 @@ class Ui_TapeDriveWindow(object):
         _translate = QtCore.QCoreApplication.translate
         TapeDriveWindow.setWindowTitle(_translate("TapeDriveWindow", "Micro In-Situ Control"))
         #self.homeEnable.setText(_translate("TapeDriveWindow", "Enable"))
-        self.groupBox_2.setTitle(_translate("TapeDriveWindow", "Step Size (deg)"))
-        self.verticalSlider.setToolTip(_translate("TapeDriveWindow", "<html><head/><body><p>Drag to change step size. Step will be set when slider is released.</p></body></html>"))
-        self.label_4.setText(_translate("TapeDriveWindow", "Half Wave Plate Rotation"))
+        #self.groupBox_2.setTitle(_translate("TapeDriveWindow", "Step Size (deg)"))
+        #self.verticalSlider.setToolTip(_translate("TapeDriveWindow", "<html><head/><body><p>Drag to change step size. Step will be set when slider is released.</p></body></html>"))
+        self.label_4.setText(_translate("TapeDriveWindow", "HWP"))
+        self.label_qwp.setText(_translate("TapeDriveWindow", "QWP"))
         self.label_5.setText(_translate("TapeDriveWindow", "Power Supply Control"))
         self.label_m.setText(_translate("TapeDriveWindow", "Main Field"))
         self.label_c.setText(_translate("TapeDriveWindow", "Compensation Field"))
         self.label_o.setText(_translate("TapeDriveWindow", "Oven Control"))
-        self.label_afp.setText(_translate("TapeDriveWindow", "RF Function Generator"))
+        self.label_afp.setText(_translate("TapeDriveWindow", "AFP Settings"))
         self.label_lps.setText(_translate("TapeDriveWindow", "Laser Power"))
         self.label_pds.setText(_translate("TapeDriveWindow", "Photodiodes"))
         self.label_cs.setText(_translate("TapeDriveWindow", "Cell Wall\nSetpoint (" + degree_sign + "C)"))
@@ -604,7 +702,9 @@ class Ui_TapeDriveWindow(object):
         self.label_pd1.setText(_translate("TapeDriveWindow", "Transmission\nPhotodiode"))
         self.label_pd2.setText(_translate("TapeDriveWindow", "EPR\nPhotodiode"))
         self.label_hr.setText(_translate("TapeDriveWindow", "Angle Readout"))
+        self.label_qr.setText(_translate("TapeDriveWindow", "Angle Readout"))
         self.label_cos.setText(_translate("TapeDriveWindow", "Current\nSetpoint (A)"))
+        self.label_afptime.setText(_translate("TapeDriveWindow", "AFP\nTimer (s)"))
         # self.label_cosr.setText(_translate("TapeDriveWindow", "Current Readout (A)"))
         self.label_ms.setText(_translate("TapeDriveWindow", "Current\nSetpoint (A)"))
         # self.label_msr.setText(_translate("TapeDriveWindow", "Current Readout (A)"))
@@ -612,6 +712,7 @@ class Ui_TapeDriveWindow(object):
         self.label_afp2.setText(_translate("TapeDriveWindow", "FWHM Frequency\n(Hz)"))
         self.label_afp3.setText(_translate("TapeDriveWindow", "Sweeprate\n(KHz/s)"))
         self.label_afp4.setText(_translate("TapeDriveWindow", "RF Amplitude\n(V)"))
+        self.label_plot.setText(_translate("TapeDriveWindow", "Plot\nEnable"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))
         self.actionQuit.setShortcut(_translate("TapeDriveWindow", "Meta+Q"))
         self.actionNothingHere.setText(_translate("TapeDriveWindow", "NothingHere"))

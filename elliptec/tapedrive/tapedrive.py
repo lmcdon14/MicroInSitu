@@ -8,7 +8,7 @@ class Tapedrive():
 	def __init__(self, motor=None):
 		if (motor is None):
 			try:
-				self.sn_mot = "DT03BPRIA"
+				self.sn_mots = ["DT03BPRIA", "DT03ANGAA", "DT03BQ5GA"]
 				self.connect_motors()
 			except IOError as e:
 				print(e)
@@ -18,7 +18,10 @@ class Tapedrive():
 			self.motor = motor
 
 	def connect_motors(self):
+		self.motors = [None] * 2
 		ports = find_ports()
+		i=0
 		for port in ports:
-			if (port.serial_number == self.sn_mot):
-				self.motor = Motor(port.device)
+			if (port.serial_number in self.sn_mots):
+				self.motors[i] = Motor(port.device)
+				i = i+1

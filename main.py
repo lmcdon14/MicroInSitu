@@ -14,6 +14,14 @@ import instruments as ik
 from instruments.abstract_instruments import FunctionGenerator
 import quantities as pq
 import math
+import matplotlib.pyplot as plt
+import array
+import numpy as np
+import nidaqmx
+from nidaqmx.stream_writers import AnalogSingleChannelWriter
+system = nidaqmx.system.system.System.local()
+import pySMC100.smc100
+from IndustrialRelayControl import ncd_industrial_relay
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -22,6 +30,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.sim = simulate
 		self.i=0
 		self.las = '770'
+		self.task = None
+		self.digi_task = None
+		self.afp_bool = False
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -32,28 +43,50 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
+		smcport = 'COM8'
 		oven_port = 'COM9'
+		relay_port = 'COM10'
 		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
-		func_gen_port = 'COM10'
+		#func_gen_port = 'COM8'
+
+		"""
+		Function Generator Code
+
+		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
+		self.srs.sendcmd('BCNT 1')
+		self.srs.sendcmd('OFFS 0')
+		self.srs.sendcmd('MENA 0')
+		self.srs.sendcmd('MTYP 5')
+		#self.srs.sendcmd('MDWF 5')
+		self.srs.sendcmd('DPTH -100')
+		"""
 
 		if simulate==False:
-			#self.tapedrive = td.Tapedrive()
-			#self.absCoords.setValue(self.tapedrive.motor.get_('position')%360)
-			# Set default stepsize
-			#self.tapedrive.motor.set_('stepsize', 
-				#self.tapedrive.motor.deg_to_hex(self.verticalSlider.value()))
-			#self.oven = cni(oven_port)
-			
-			self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
-			self.srs.function = self.srs.Function.arbitrary
-			self.srs.sendcmd('BCNT 1')
-			self.srs.sendcmd('OFFS 0')
-			self.srs.sendcmd('MENA 1')
-			self.srs.sendcmd('MTYP 2')
+			#Connect rotation mount(s)
+			self.tapedrive = td.Tapedrive()
+			i=0
+			for motor in self.tapedrive.motors:
+				self.absCoords[i].setValue(motor.get_('position')%360)
+				#motor.set_('stepsize', motor.deg_to_hex(self.verticalSlider.value()))
+				i += 1
 
-			if self.laser == '770':
+			#If there is only one Thorlabs rotation mount use Newport QWP mount
+			if self.tapedrive.motors[1] == None:
+				self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=False)
+				self.smc100.home()
+
+			#Connect Omega controller for oven
+			self.oven = cni(oven_port)
+
+			#Connect DAQ board
+			for device in system.devices:
+				print(device)
+			self.daq = system.devices[0]
+
+			#Connect Laser
+			if self.las == '770':
 				self.lasSer = ComSerial(sim=simulate)
 				self.lasSer.QuerySetupGUI()   
 				self.lasSer.QueryRefreshGUI()
@@ -63,31 +96,48 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.lasSer.ConnectPort()
 				self.lasSer.ConnectDevice()
 			else:
+				# 795nm QPC laser control (don't have the serial enabled power supply)
 				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
 					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
 		
+		#Connect Power Supplies
 		#self.Field = ag.MagneticField(simulate=True)
 		self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
 		
-		self.btnForward.clicked.connect(self.forward)
+		#self.btnForward.clicked.connect(self.forward)
 		# self.btnForward.clicked.connect(self.absolute)
-		self.btnBackward.clicked.connect(self.backward)
-		self.btnHome.clicked.connect(self.home)
+		#self.btnBackward.clicked.connect(self.backward)
+		#self.btnHome.clicked.connect(self.home)
+		#self.verticalSlider.valueChanged.connect(self.on_slider_drag)
+		#self.verticalSlider.sliderReleased.connect(self.on_slider_release)
+		#self.spinBox.valueChanged.connect(self.on_spin_box)
+		#self.homeEnable.toggled.connect(self.home_button_toggle)
 
-		self.verticalSlider.valueChanged.connect(self.on_slider_drag)
-		self.verticalSlider.sliderReleased.connect(self.on_slider_release)
-		self.spinBox.valueChanged.connect(self.on_spin_box)
+		if self.sim == False:
+			self.absCoordset[0].valueChanged.connect(self.absolute1)
+			if self.tapedrive.motors[1] != None:
+				self.absCoordset[1].valueChanged.connect(self.absolute2)
+				self.absCoordset[1].setMinimum(0)
+				self.absCoordset[1].setMaximum(359)
+			else:
+				self.absCoordset[1].valueChanged.connect(self.newport)
+				self.absCoordset[1].setMinimum(-165)
+				self.absCoordset[1].setMaximum(165)
+
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
-		self.homeEnable.toggled.connect(self.home_button_toggle)
 		self.ps1Out.toggled.connect(self.ps1enable)
 		self.ps2Out.toggled.connect(self.ps2enable)
+
 		self.oventog.toggled.connect(self.oventoggle)
 		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
 		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
+
 		self.lasOut.clicked.connect(self.lasRamp)
+		
 		self.AFPOut.clicked.connect(self.AFP)
+		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(1000)
@@ -102,6 +152,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.lasdelta = 0.01 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
 		self.failflag = 0
 
+		self.afptimer = QtCore.QTimer()
+		self.afptimer.setInterval(self.afptime.value())
+		self.afptimer.timeout.connect(self.afptimeout)
+		self.AFPTimerOut.clicked.connect(self.afptimerun)
+
+	"""
 	def forward(self):
 		if self.sim == False:
 			pos = self.tapedrive.motor.do_('forward')
@@ -121,15 +177,31 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			oldVal = self.absCoords.value()
 			step = self.spinBox.value()
 			self.absCoords.setValue((oldVal - step)%360)
+	"""
 
-	def absolute(self):
+	def absolute1(self):
+		ind = 0
 		if self.sim == False:
-			pos = self.tapedrive.motor.do_('absolute', data=self.tapedrive.motor.deg_to_hex(self.spinBox.value()))
+			pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
 			if pos != 420:
-				self.absCoords.setValue(pos)
+				self.absCoords[ind].setValue(pos)
 		else:
-			self.absCoords.setValue(self.spinBox.value())
+			self.absCoords[ind].setValue(self.absCoordset[ind].value())
+			
+	def absolute2(self):
+		ind = 1
+		if self.sim == False:
+			pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
+			if pos != 420:
+				self.absCoords[ind].setValue(pos)
+		else:
+			self.absCoords[ind].setValue(self.absCoordset[ind].value())
 
+	def newport(self):
+		if self.sim == False:
+			self.smc100.move_absolute_mm(self.absCoordset[1].value())
+	
+	"""
 	def home(self):
 		if self.sim == False:
 			pos = self.tapedrive.motor.do_('home')
@@ -150,6 +222,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			#print(cmd_val)
 			self.tapedrive.motor.set_('stepsize', cmd_val)
 			self.tapedrive.motor.get_('stepsize')
+	"""
 
 	def on_ps1_box(self):
 		psu = self.Field.psus[0].psu
@@ -254,37 +327,172 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def AFP(self):
 		self.animAFP.start()
-		self.srs.trigger()
+		if self.afp_bool == False:
+			self.afp_bool = True
+		else:
+			self.afp_bool = False
+
+		if self.sim==False:
+			print('Output triggered')
+			if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+				if (self.afp_bool):
+					print("Flipped spin")
+				else:
+					print("Original spin")
+			else:
+				print("Status bit unsuccessful.")
+			self.task.start()
+			self.task.wait_until_done()
+			self.task.stop()
+			
+			#Flip rotation of QWP
+			"""
+			if self.afp_bool = False:
+				self.QWP.rotate(self.QWP_right_pos)
+			else:
+				self.QWP.rotate(self.QWP_left_pos)
+			"""
+			print('Task complete\n')
+
+			#Function generator code
+			#self.srs.trigger()
+		else:
+			print("Spin flipped")
+			if (self.afp_bool):
+				print("Flipped spin")
+			else:
+				print("Original spin")
 	
 	def AFPSendWvfm(self):
-		RFamp = 2*self.RFampspinBox.value()
-		self.srs._set_amplitude_(RFamp,FunctionGenerator.VoltageMode.peak_to_peak)
-		FsweepRate = 1000*self.SweepspinBox.value()
-		Ffwhm = self.FWHMspinBox.value()
-		Fcent = self.FcentspinBox.value()
-		Fmin = 0.65*Fcent
-		Fmax = 1.5*Fcent
-		npnts = 10000
-		totaltime = (Fmax-Fmin)/FsweepRate
-		tpnt = npnts/totaltime
-		div = int(tpnt/(0.3*10^(-6)))
-		self.srs.sendcmd('AMRT {}'.format(div))
+		if self.sim==False:
+			self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
+			RFamp = self.RFampspinBox.value()
+			FsweepRate = self.SweepspinBox.value()/1000
+			Ffwhm = self.FWHMspinBox.value()
+			Fcent = self.FcentspinBox.value()
+			Fmin = 0.55*Fcent
+			Fmax = 1.5*Fcent
+			totaltime = (Fmax-Fmin)/(FsweepRate*1e6)
+			npnts = int(totaltime*1e6+0.5)
+			
+			#data = np.zeros(npnts, dtype='<i2')
+			data = np.zeros(npnts)
+			for x in range (npnts):
+				# Freq = Fmin+FsweepRate*x
+				# given code showed "=" instead of "+" below...
+				# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+				# Note factor of 2 in rate to keep peak in correct place
+				#val = int((32676*RFamp/10*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x))+0.5)
+				val = RFamp*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
+				data[x] = val
+				
+			self.data = data
 
-		self.srs.sendcmd('AMOD? 10000')
-		
-		checksum = 0
-		AFPOutWave = [0] * (npnts + 1)
-		for x in range (npnts):
-			# Freq = Fmin+FsweepRate*x
-			# given code showed "=" instead of "+" below...
-			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )       
-			# Note factor of 2 in rate to keep peak in correct place
-			val = int(32767*math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 ) * math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)+0.5)
-			AFPOutWave[x] = '{0:b}'.format(val)
-			checksum = checksum + val
+			if (self.plotEnable.isChecked()):
+				plt.clf()
+				plt.close()
+				plt.plot(range(npnts), data, '-o')
+				plt.title('AFP Function')
+				plt.xlabel('Time (us)')
+				plt.ylabel('Voltage (V)')
+				plt.show()
+				print(np.amin(data), np.amax(data))
+			
+			if (self.task != None):
+				self.task.close()
+			else:
+				self.AFPOut.setEnabled(True)
+				self.digi_task = nidaqmx.task.Task()
+				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				#self.digi_task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
+				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
-		AFPOutWave[npnts] = '{0:b}'.format(checksum)
-		self.srs.sendcmd(",".join(AFPOutWave))
+			self.task = nidaqmx.task.Task()
+			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
+			self.task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
+			self.writer = AnalogSingleChannelWriter(self.task.out_stream, auto_start=False)
+			print(self.writer.write_many_sample(data))
+			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
+			
+			self.AFPwave.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
+		else:
+			print("Waveform sent")
+			self.AFPOut.setEnabled(True)
+			self.task = 0 # arbitrary value for simulating output
+
+	def AFPSendWvfm_funcgen(self):
+		if self.sim == False:
+			self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
+			RFamp = 2*self.RFampspinBox.value()
+			self.srs._set_amplitude_(RFamp,FunctionGenerator.VoltageMode.peak_to_peak)
+			FsweepRate = 1000*self.SweepspinBox.value()
+			Ffwhm = self.FWHMspinBox.value()
+			Fcent = self.FcentspinBox.value()
+			Fmin = 0.55*Fcent
+			Fmax = 1.5*Fcent
+			totaltime = (Fmax-Fmin)/FsweepRate
+			npnts = 16001
+			og = npnts
+			checksum = 32768
+			while(abs(checksum) > 32767 or npnts < og-100 or npnts < 2):
+				npnts = npnts-1
+				tpnt = totaltime/npnts
+				act_freq = 1/tpnt
+				print(tpnt, act_freq, int(act_freq+0.5))
+				FsweepR = FsweepRate*tpnt # sweeprate per point (not per second)
+				# print('sweeprate = {:f}'.format(FsweepRate))
+				#div = int(tpnt/(0.3*math.pow(10,(-6))))
+
+				checksum = 0
+				data = [0] * (npnts + 1)
+				for x in range (npnts):
+					# Freq = Fmin+FsweepRate*x
+					# given code showed "=" instead of "+" below...
+					# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+					# Note factor of 2 in rate to keep peak in correct place
+					val = 2047*math.exp( -1* (math.pow(((Fmin + FsweepR*x)-Fcent),2)/(math.pow(Ffwhm,2)) ) ) * math.sin(2*math.pi*(Fmin +0.5*FsweepR*x)*x)+0.5
+					#val = 2047*math.sin(2/100*math.pi*x)+0.5
+					data[x] = int(val)
+					checksum = checksum + int(val)
+				data[npnts] = checksum
+				print('{:d}, {:d}'.format(npnts,checksum))
+
+			self.srs.sendcmd('FSMP {:d}'.format(int(act_freq+0.5)))
+			#self.srs.sendcmd('AMRT {:d}'.format(div))
+
+			self.srs.sendcmd('LDWF? 0,{:d}'.format(npnts))
+			i=0
+			while(self.srs.read(1) != '1' or i>=5):
+				True
+				i=i+1
+				if i==1:
+					print('Read failed {:d} time'.format(i))
+				else:
+					print('Read failed {:d} times'.format(i))
+
+			plt.plot(range(npnts), data[0:npnts], '-o')
+			plt.title('AFP Function')
+			plt.xlabel('nth point')
+			plt.ylabel('magnitude (-32676,32676)')
+			plt.show()
+
+			#print(data[npnts])
+			
+			if (i<5):
+				for pt in range(npnts+1):
+					if (abs(data[pt]) > 32767):
+						print('Load range error!')
+					self.srs.write((data[pt]).to_bytes(2, 'little', signed=True), bin=True)
+
+				self.srs.sendcmd('MENA 1')
+				self.AFPOut.setEnabled(True)
+			else:
+				print('Function loading failed.')
+			self.AFPwave.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}") 
+		else:
+			print("Waveform sent")
+			self.AFPOut.setEnabled(True)
+			self.task = 0 # arbitrary value for simulating output
 
 	def lasRamp(self):
 		# if another setpoint is still being ramped toward stop that timer and ramp toward new setpoint
@@ -378,6 +586,25 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 						print("Desired laser current reached.")
 			# else wait for current to stabilize to previous laser setting before updating current setpoint
 
+	def afptimeout(self):
+		if self.task != None:
+			self.AFPOut.click()
+		else:
+			print("No waveform loaded. Loading now...")
+			self.AFPwave.click()
+
+	def afptimerun(self):
+		if self.AFPTimerOut.isChecked():
+			self.AFPTimerOut.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}")
+			self.afptimer.setInterval(self.afptime.value()*1000)
+			print("AFP running every {:.0f} seconds".format(self.afptime.value()))
+			self.afptimeout()
+			self.afptimer.start()
+		else:
+			self.AFPTimerOut.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
+			print("AFP stopped")
+			self.afptimer.stop()
+
 	def on_slider_release(self):
 		val = self.verticalSlider.value()
 		if self.sim==False:
@@ -425,6 +652,16 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# close connection to omega controller
 		if self.sim == False:
 			self.oven.close()
+
+		if self.digi_task != None:
+			self.task.close()
+			self.digi_task.close()
+
+		# Close connection with Newport rotation stage
+		if self.sim == False:
+			if self.tapedrive.motors[1] == None:
+				self.smc100.close()
+				del self.smc100
 
 		# and afterwards call the closeEvent of the super-class
 		super(QtWidgets.QMainWindow, self).closeEvent(event)
