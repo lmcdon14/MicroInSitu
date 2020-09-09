@@ -20,7 +20,7 @@ import numpy as np
 import nidaqmx
 from nidaqmx.stream_writers import AnalogSingleChannelWriter
 system = nidaqmx.system.system.System.local()
-import pySMC100.smc100
+#import pySMC100.smc100
 from IndustrialRelayControl import ncd_industrial_relay
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
@@ -74,7 +74,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 			#If there is only one Thorlabs rotation mount use Newport QWP mount
 			if self.tapedrive.motors[1] == None:
-				self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=False)
+				#self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=False)
 				self.smc100.home()
 
 			#Connect Omega controller for oven
@@ -120,10 +120,18 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.absCoordset[1].valueChanged.connect(self.absolute2)
 				self.absCoordset[1].setMinimum(0)
 				self.absCoordset[1].setMaximum(359)
+				self.QWP_right_pos.setMinimum(0)
+				self.QWP_right_pos.setMaximum(359)
+				self.QWP_left_pos.setMinimum(0)
+				self.QWP_left_pos.setMaximum(359)
 			else:
 				self.absCoordset[1].valueChanged.connect(self.newport)
 				self.absCoordset[1].setMinimum(-165)
 				self.absCoordset[1].setMaximum(165)
+				self.QWP_right_pos.setMinimum(-165)
+				self.QWP_right_pos.setMaximum(165)
+				self.QWP_left_pos.setMinimum(-165)
+				self.QWP_left_pos.setMaximum(165)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -346,12 +354,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.task.stop()
 			
 			#Flip rotation of QWP
-			"""
-			if self.afp_bool = False:
-				self.QWP.rotate(self.QWP_right_pos)
+			if self.afp_bool == False:
+				self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
 			else:
-				self.QWP.rotate(self.QWP_left_pos)
-			"""
+				self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
 			print('Task complete\n')
 
 			#Function generator code

@@ -202,6 +202,26 @@ class Ui_TapeDriveWindow(object):
         self.absCoordset[1].setProperty("value", 45)
         self.absCoordset[1].setObjectName("absCoordset2")
 
+        # QWP Right Hand Circular Position
+        self.QWP_right_pos = QtWidgets.QSpinBox(self.centralwidget)
+        self.QWP_right_pos.setGeometry(QtCore.QRect(320+3*320/4+5, 50, 60, 40))
+        self.QWP_right_pos.setFont(font)
+        self.QWP_right_pos.setAlignment(QtCore.Qt.AlignHCenter)
+        self.QWP_right_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.QWP_right_pos.setKeyboardTracking(False)
+        self.QWP_right_pos.setProperty("value", 45)
+        self.QWP_right_pos.setObjectName("QWP_right_pos")
+
+        # QWP Left Hand Circular Position
+        self.QWP_left_pos = QtWidgets.QSpinBox(self.centralwidget)
+        self.QWP_left_pos.setGeometry(QtCore.QRect(320+1*320/4+5, 50, 60, 40))
+        self.QWP_left_pos.setFont(font)
+        self.QWP_left_pos.setAlignment(QtCore.Qt.AlignHCenter)
+        self.QWP_left_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.QWP_left_pos.setKeyboardTracking(False)
+        self.QWP_left_pos.setProperty("value", 45)
+        self.QWP_left_pos.setObjectName("QWP_left_pos")
+
         # Rotation Label
         self.label_4 = QtWidgets.QLabel(self.centralwidget)
         self.label_4.setGeometry(QtCore.QRect(10, 5, 301, 41))
@@ -376,6 +396,18 @@ class Ui_TapeDriveWindow(object):
         self.label_plot.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_plot.setAlignment(QtCore.Qt.AlignCenter)
         self.label_plot.setObjectName("label_plot")
+        # Left Hand QWP Setpoint Label
+        self.label_left = QtWidgets.QLabel(self.centralwidget)
+        self.label_left.setGeometry(QtCore.QRect(320+5, 50, 81, 41))
+        self.label_left.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_left.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_left.setObjectName("label_left")
+        # Right Hand QWP Setpoint Label
+        self.label_right = QtWidgets.QLabel(self.centralwidget)
+        self.label_right.setGeometry(QtCore.QRect(320+2*320/4+5, 50, 81, 41))
+        self.label_right.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_right.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_right.setObjectName("label_right")
 
         # Power Supply Control 1
         self.ps1spinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -713,6 +745,8 @@ class Ui_TapeDriveWindow(object):
         self.label_afp3.setText(_translate("TapeDriveWindow", "Sweeprate\n(KHz/s)"))
         self.label_afp4.setText(_translate("TapeDriveWindow", "RF Amplitude\n(V)"))
         self.label_plot.setText(_translate("TapeDriveWindow", "Plot\nEnable"))
+        self.label_left.setText(_translate("TapeDriveWindow", "Spin Down\nSetpoint"))
+        self.label_right.setText(_translate("TapeDriveWindow", "Spin Up\nSetpoint"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))
         self.actionQuit.setShortcut(_translate("TapeDriveWindow", "Meta+Q"))
         self.actionNothingHere.setText(_translate("TapeDriveWindow", "NothingHere"))
