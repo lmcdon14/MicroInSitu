@@ -158,48 +158,48 @@ class Ui_TapeDriveWindow(object):
 
         # HWP Absolute Coordinates
         self.absCoords[0] = QtWidgets.QSpinBox(self.centralwidget)
-        self.absCoords[0].setGeometry(QtCore.QRect(130, 150, 60, 40))
+        self.absCoords[0].setGeometry(QtCore.QRect(110, 150, 100, 40))
         self.absCoords[0].setFont(font)
         self.absCoords[0].setReadOnly(True)
         self.absCoords[0].setAlignment(QtCore.Qt.AlignHCenter)
         self.absCoords[0].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.absCoords[0].setMinimum(0)
         self.absCoords[0].setMaximum(359)
-        self.absCoords[0].setProperty("value", 45)
+        self.absCoords[0].setProperty("value", 0)
         self.absCoords[0].setObjectName("absCoords1")
 
         # HWP Absolute Coordinates Setpoint
         self.absCoordset[0] = QtWidgets.QSpinBox(self.centralwidget)
-        self.absCoordset[0].setGeometry(QtCore.QRect(130, 100, 60, 40))
+        self.absCoordset[0].setGeometry(QtCore.QRect(110, 100, 100, 40))
         self.absCoordset[0].setFont(font)
         self.absCoordset[0].setAlignment(QtCore.Qt.AlignHCenter)
         self.absCoordset[0].setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.absCoordset[0].setKeyboardTracking(False)
         self.absCoordset[0].setMinimum(0)
         self.absCoordset[0].setMaximum(359)
-        self.absCoordset[0].setProperty("value", 45)
+        self.absCoordset[0].setProperty("value", 0)
         self.absCoordset[0].setObjectName("absCoordset1")
 
         # QWP Absolute Coordinates
         self.absCoords[1] = QtWidgets.QSpinBox(self.centralwidget)
-        self.absCoords[1].setGeometry(QtCore.QRect(320+130, 150, 60, 40))
+        self.absCoords[1].setGeometry(QtCore.QRect(320+110, 150, 100, 40))
         self.absCoords[1].setFont(font)
         self.absCoords[1].setReadOnly(True)
         self.absCoords[1].setAlignment(QtCore.Qt.AlignHCenter)
         self.absCoords[1].setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.absCoords[1].setMinimum(0)
+        self.absCoords[1].setMinimum(-359)
         self.absCoords[1].setMaximum(359)
-        self.absCoords[1].setProperty("value", 45)
+        self.absCoords[1].setProperty("value", 0)
         self.absCoords[1].setObjectName("absCoords2")
 
         # QWP Absolute Coordinates Setpoint
         self.absCoordset[1] = QtWidgets.QSpinBox(self.centralwidget)
-        self.absCoordset[1].setGeometry(QtCore.QRect(320+130, 100, 60, 40))
+        self.absCoordset[1].setGeometry(QtCore.QRect(320+110, 100, 100, 40))
         self.absCoordset[1].setFont(font)
         self.absCoordset[1].setAlignment(QtCore.Qt.AlignHCenter)
         self.absCoordset[1].setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.absCoordset[1].setKeyboardTracking(False)
-        self.absCoordset[1].setProperty("value", 45)
+        self.absCoordset[1].setProperty("value", 0)
         self.absCoordset[1].setObjectName("absCoordset2")
 
         # QWP Right Hand Circular Position
@@ -209,7 +209,7 @@ class Ui_TapeDriveWindow(object):
         self.QWP_right_pos.setAlignment(QtCore.Qt.AlignHCenter)
         self.QWP_right_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.QWP_right_pos.setKeyboardTracking(False)
-        self.QWP_right_pos.setProperty("value", 45)
+        self.QWP_right_pos.setProperty("value", 130)
         self.QWP_right_pos.setObjectName("QWP_right_pos")
 
         # QWP Left Hand Circular Position
@@ -219,7 +219,7 @@ class Ui_TapeDriveWindow(object):
         self.QWP_left_pos.setAlignment(QtCore.Qt.AlignHCenter)
         self.QWP_left_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.QWP_left_pos.setKeyboardTracking(False)
-        self.QWP_left_pos.setProperty("value", 45)
+        self.QWP_left_pos.setProperty("value", -130)
         self.QWP_left_pos.setObjectName("QWP_left_pos")
 
         # Rotation Label
@@ -464,8 +464,9 @@ class Ui_TapeDriveWindow(object):
         self.cellspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.cellspinBox.setStyleSheet("color: red;")
         self.cellspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.cellspinBox.setKeyboardTracking(False)
         self.cellspinBox.setMinimum(0.0)
-        self.cellspinBox.setMaximum(220.0)
+        self.cellspinBox.setMaximum(250.0)
         self.cellspinBox.setProperty("value", 20.0)
         self.cellspinBox.setObjectName("cellspinBox")
 
@@ -476,8 +477,9 @@ class Ui_TapeDriveWindow(object):
         self.ovenspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.ovenspinBox.setStyleSheet("color: lightgrey;")
         self.ovenspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.ovenspinBox.setKeyboardTracking(False)
         self.ovenspinBox.setMinimum(0.0)
-        self.ovenspinBox.setMaximum(220.0)
+        self.ovenspinBox.setMaximum(250.0)
         self.ovenspinBox.setProperty("value", 20.0)
         self.ovenspinBox.setObjectName("ovenspinBox")
 
@@ -579,6 +581,8 @@ class Ui_TapeDriveWindow(object):
         self.cellreadout.setGeometry(QtCore.QRect(110, 550, 100, 40))
         self.cellreadout.setFont(font)
         self.cellreadout.setReadOnly(True)
+        self.cellreadout.setMinimum(0.0)
+        self.cellreadout.setMaximum(300.0)
         self.cellreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.cellreadout.setAlignment(QtCore.Qt.AlignHCenter)
         self.cellreadout.setStyleSheet("color: red;")
@@ -589,6 +593,8 @@ class Ui_TapeDriveWindow(object):
         self.ovenreadout.setGeometry(QtCore.QRect(430, 550, 100, 40))
         self.ovenreadout.setFont(font)
         self.ovenreadout.setReadOnly(True)
+        self.ovenreadout.setMinimum(0.0)
+        self.ovenreadout.setMaximum(300.0)
         self.ovenreadout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.ovenreadout.setAlignment(QtCore.Qt.AlignHCenter)
         self.ovenreadout.setStyleSheet("color: lightgrey;")
@@ -692,6 +698,14 @@ class Ui_TapeDriveWindow(object):
         self.AFPwave.setCheckable(True)
         self.AFPwave.setText("Send New\nWaveform")
         self.AFPwave.setObjectName("AFPwave")
+
+        # AFP Sequencing Dropdown Menu
+        self.AFPDrop = QtWidgets.QComboBox(self.centralwidget)
+        self.AFPDrop.setGeometry(QtCore.QRect(300, 803, 100, 35))
+        self.AFPDrop.setStyleSheet("QPushButton {background-color: white; color: black; border-radius:5px;}")
+        self.AFPDrop.setFont(font2)
+        self.AFPDrop.addItem("10101010")
+        self.AFPDrop.addItem("10010110")
 
         TapeDriveWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(TapeDriveWindow)

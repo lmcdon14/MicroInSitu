@@ -8,7 +8,7 @@ import elliptec.tapedrive as td
 import elliptec
 import agilent as ag
 import serial
-from PyExpLabSys.drivers.omega_cni import CNi3244_C24 as cni
+from PyExpLabSys.drivers.omega_cni import ISeries as cni
 from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
 import instruments as ik
 from instruments.abstract_instruments import FunctionGenerator
@@ -20,8 +20,7 @@ import numpy as np
 import nidaqmx
 from nidaqmx.stream_writers import AnalogSingleChannelWriter
 system = nidaqmx.system.system.System.local()
-#import pySMC100.smc100
-from IndustrialRelayControl import ncd_industrial_relay
+import pySMC100.smc100
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -49,11 +48,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
-		#func_gen_port = 'COM8'
 
 		"""
 		Function Generator Code
-
+		func_gen_port = 'COM8'
 		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
 		self.srs.sendcmd('BCNT 1')
 		self.srs.sendcmd('OFFS 0')
@@ -63,22 +61,25 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.srs.sendcmd('DPTH -100')
 		"""
 
-		if simulate==False:
+		if simulate==False:			
 			#Connect rotation mount(s)
 			self.tapedrive = td.Tapedrive()
 			i=0
 			for motor in self.tapedrive.motors:
-				self.absCoords[i].setValue(motor.get_('position')%360)
-				#motor.set_('stepsize', motor.deg_to_hex(self.verticalSlider.value()))
-				i += 1
+				if motor != None:
+					val = motor.get_('position')%360
+					self.absCoords[i].setValue(val)
+					self.absCoordset[i].setValue(val)
+					#motor.set_('stepsize', motor.deg_to_hex(self.verticalSlider.value()))
+					i += 1
 
 			#If there is only one Thorlabs rotation mount use Newport QWP mount
 			if self.tapedrive.motors[1] == None:
-				#self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=False)
+				self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=True)
 				self.smc100.home()
-
-			#Connect Omega controller for oven
-			self.oven = cni(oven_port)
+				val = self.smc100.get_position_mm()
+				self.absCoords[1].setValue(val)
+				self.absCoordset[1].setValue(val)
 
 			#Connect DAQ board
 			for device in system.devices:
@@ -99,6 +100,22 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				# 795nm QPC laser control (don't have the serial enabled power supply)
 				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
 					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
+
+			# Connect Omega controller
+			self.oven = cni(oven_port, baudrate=9600)
+			self.ovenspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
+			self.cellspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
+			
+			#Connect oven relay and switch relay to cell wall
+			self.ovenRelayPort = serial.Serial(relay_port, baudrate=9600, bytesize=8, stopbits=1, timeout=0.5)
+			mybytes = bytearray()
+			mybytes.append(254)
+			mybytes.append(0)
+			self.ovenRelayPort.write(mybytes)
+			mybytes = bytearray()
+			mybytes.append(254)
+			mybytes.append(2)
+			self.ovenRelayPort.write(mybytes)
 		
 		#Connect Power Supplies
 		#self.Field = ag.MagneticField(simulate=True)
@@ -122,16 +139,20 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.absCoordset[1].setMaximum(359)
 				self.QWP_right_pos.setMinimum(0)
 				self.QWP_right_pos.setMaximum(359)
+				self.QWP_right_pos.setProperty("value", 265)
 				self.QWP_left_pos.setMinimum(0)
 				self.QWP_left_pos.setMaximum(359)
+				self.QWP_left_pos.setProperty("value", 175)
 			else:
 				self.absCoordset[1].valueChanged.connect(self.newport)
 				self.absCoordset[1].setMinimum(-165)
 				self.absCoordset[1].setMaximum(165)
 				self.QWP_right_pos.setMinimum(-165)
 				self.QWP_right_pos.setMaximum(165)
+				self.QWP_right_pos.setProperty("value", 130)
 				self.QWP_left_pos.setMinimum(-165)
 				self.QWP_left_pos.setMaximum(165)
+				self.QWP_left_pos.setProperty("value", -130)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -148,7 +169,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
-		self.timer.setInterval(1000)
+		self.timer.setInterval(10000)
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
@@ -208,6 +229,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def newport(self):
 		if self.sim == False:
 			self.smc100.move_absolute_mm(self.absCoordset[1].value())
+			loc = self.smc100.get_position_mm()
+			#print(loc)
+			self.absCoords[1].setValue(loc)
+		else:
+			self.absCoords[1].setValue(self.absCoordset[1].value())
 	
 	"""
 	def home(self):
@@ -306,8 +332,25 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.cellreadout.setStyleSheet("color: lightgrey;")
 			self.ovenreadout.setStyleSheet("color: red;")
 			print("Oven wall setpoint being used.")
-			# Toggle thermocouple relay back to oven wall
-			# Set heater setpoint to the value at self.ovenspinBox
+			
+			if self.sim == False:
+				# Toggle thermocouple relay back to cell wall
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(1)
+				self.ovenRelayPort.write(mybytes)
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(3)
+				self.ovenRelayPort.write(mybytes)
+
+				# Set heater setpoint to the value at self.ovenspinBox
+				setpoint = self.ovenspinBox.value()
+				setpoint_str = (int(setpoint*10).to_bytes(3, byteorder='big')).hex().upper()
+				setpoint_str = setpoint_str.replace('0', '2', 1)
+				#print(setpoint_str)
+				self.oven.command('W01' + setpoint_str)
+				#print(self.oven.command('R01'))
 
 		else:
 			self.oventog.setText("Cell Wall") 
@@ -316,22 +359,47 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ovenreadout.setStyleSheet("color: lightgrey;")
 			self.cellreadout.setStyleSheet("color: red;")
 			print("Cell wall setpoint being used.")
-			# Toggle thermocouple relay back to cell wall
-			# Set heater setpoint to the value at self.cellspinBox
+			
+			if self.sim == False:
+				# Toggle thermocouple relay back to cell wall
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(0)
+				self.ovenRelayPort.write(mybytes)
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(2)
+				self.ovenRelayPort.write(mybytes)
+
+				# Set heater setpoint to the value at self.cellspinBox
+				setpoint = self.cellspinBox.value()
+				setpoint_str = (int(setpoint*10).to_bytes(3, byteorder='big')).hex().upper()
+				setpoint_str = setpoint_str.replace('0', '2', 1)
+				#print(setpoint_str)
+				self.oven.command('W01' + setpoint_str)
+				#print(self.oven.command('R01'))
 
 	def ovensetpoint(self):
 		if self.oventog.isChecked():
 			# Change heater setpoint to new value at self.ovenspinBox
 			if self.sim == False:
 				setpoint = self.ovenspinBox.value()
-				self.oven.command('rw' + str(int(setpoint)))
+				setpoint_str = (int(setpoint*10).to_bytes(3, byteorder='big')).hex().upper()
+				setpoint_str = setpoint_str.replace('0', '2', 1)
+				#print(setpoint_str)
+				self.oven.command('W01' + setpoint_str)
+				#print(self.oven.command('R01'))
 
 	def cellsetpoint(self):
 		if not self.oventog.isChecked():
 			# Change heater setpoint to new value at self.cellspinBox
 			if self.sim == False:
 				setpoint = self.cellspinBox.value()
-				self.oven.command('rw' + str(int(setpoint)))
+				setpoint_str = (int(setpoint*10).to_bytes(3, byteorder='big')).hex().upper()
+				setpoint_str = setpoint_str.replace('0', '2', 1)
+				#print(setpoint_str)
+				self.oven.command('W01' + setpoint_str)
+				#print(self.oven.command('R01'))
 
 	def AFP(self):
 		self.animAFP.start()
@@ -368,6 +436,13 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				print("Flipped spin")
 			else:
 				print("Original spin")
+
+			#Flip rotation of QWP
+			if self.afp_bool == False:
+				self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
+			else:
+				self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
+			print('Task complete\n')
 	
 	def AFPSendWvfm(self):
 		if self.sim==False:
@@ -516,12 +591,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def ramptimeout(self):
 		if self.sim==False:
 			if self.las == '770':
-				self.mySerial.QuerySTT()
-				self.lasreadout.setValue(self.mySerial.GenData.MC)
-				lasval = self.mySerial.GenData.MC
+				self.lasSer.QuerySTT()
+				self.lasreadout.setValue(self.lasSer.GenData.MC)
+				lasval = self.lasSer.GenData.MC
 			else:
-				self.mySerial.write(('I\r').encode())
-				test=self.mySerial.readline()
+				self.lasSer.write(('I\r').encode())
+				test=self.lasSer.readline()
 				lasval=float(test.decode("utf-8"))
 				self.lasreadout.setValue(lasval)
 		else:
@@ -543,7 +618,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					if abs(dif) < self.rampspinBox.value()/(1000/self.lasint):
 						# if ramp rate not exceeded, set power supply current to desired setpoint
 						if self.sim==False:
-							if self.mySerial.SetCurrent(self.lasspinBox.value()):
+							if self.lasSer.SetCurrent(self.lasspinBox.value()):
 								if not self.failflag > 1:
 									print("Final ramp setting applied.")
 								self.lasprev = self.lasspinBox.value()
@@ -558,7 +633,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 						# amount for the given ramp rate
 						if lasval > self.lasspinBox.value():
 							if self.sim==False:
-								if not self.mySerial.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
+								if not self.lasSer.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
 									if not self.failflag > 1:
 										print("Failed to continue ramping.")
 									self.failflag += 1
@@ -568,7 +643,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
 						else:
 							if self.sim==False:
-								if not self.mySerial.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
+								if not self.lasSer.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
 									if not self.failflag > 1:
 										print("Failed to continue ramping.")
 									self.failflag += 1
@@ -582,7 +657,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					self.ramptimer.stop()
 					if lasval < self.lasdelta:
 						if self.sim==False:
-							if self.mySerial.SetOutputOFF():
+							if self.lasSer.SetOutputOFF():
 								print("Laser turned off.")
 							else:
 								print("Laser failed to turn off.")
@@ -623,41 +698,33 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.btnHome.setEnabled(self.homeEnable.isChecked())
 
 	def recurring_timer(self):
-		# Update laser current readout
-		# self.lasReadout.setValue(self.las.value())
-
-		#Update power supply readouts
 		if self.sim==False:
-			self.ps1readspinBox = self.psus[0].psu.output[0].measure('current')
-			self.ps2readspinBox = self.psus[1].psu.output[0].measure('current')
+			#Update power supply readouts
+			self.ps1readspinBox.setValue(self.psus[0].psu.outputs[0].measure('current'))
+			self.ps2readspinBox.setValue(self.psus[1].psu.outputs[0].measure('current'))
 
-		# Update photodiode readouts
-		# self.pdreadout.setValue(self.pds[0].value())
-		# self.pd2readout.setValue(self.pds[1].value())
+			# Update photodiode readouts
+			# self.pdreadout.setValue(self.pds[0].value())
+			# self.pd2readout.setValue(self.pds[1].value())
 
-		# Update oven readout (cell/wall)
-		if self.oventog.isChecked(): 
-			# self.ovenreadout.setValue(self.oven.read_temperature())
-			self.ovenreadout.setValue(self.i)
-
-		else:
-			# self.cellreadout.setValue(self.oven.read_temperature())
-			self.cellreadout.setValue(self.i)
-		
-		self.i += 1
-
-
+			# Update oven readout (cell/wall)
+			if self.oventog.isChecked(): 
+				self.ovenreadout.setValue(self.oven.read_temperature())
+				
+			else:
+				self.cellreadout.setValue(self.oven.read_temperature())
+			
 	def closeEvent(self, event):
-		# here you can terminate your threads and do other stuff
-		# turn off all power supplies
+		# Turn off all power supplies
 		for psu in self.psus:
 			for output in psu.psu.outputs:
 				output.enabled = False
 			psu.psu.close()
 			
-		# close connection to omega controller
+		# Close connection to omega controller
 		if self.sim == False:
 			self.oven.close()
+			self.ovenRelayPort.close()
 
 		if self.digi_task != None:
 			self.task.close()
