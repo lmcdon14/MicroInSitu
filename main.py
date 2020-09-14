@@ -32,6 +32,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.task = None
 		self.digi_task = None
 		self.afp_bool = False
+		self.afp_old = False
+		self.afp_ind = 0
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -96,6 +98,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.lasSer.SetComAddress(laser_add)
 				self.lasSer.ConnectPort()
 				self.lasSer.ConnectDevice()
+				self.lasSer.QuerySTT()
+				self.lasreadout.setValue(self.lasSer.GenData.MC)
+				self.lasspinBox.setValue(self.lasSer.GenData.MC)
 			else:
 				# 795nm QPC laser control (don't have the serial enabled power supply)
 				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
@@ -121,9 +126,18 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		#self.Field = ag.MagneticField(simulate=True)
 		self.Field = ag.MagneticField(simulate=simulate)
 		self.psus = self.Field.psus
+		if self.sim == False:
+			cur1 = self.psus[0].psu.outputs[0].measure('current')
+			cur2 = self.psus[1].psu.outputs[0].measure('current')
+			self.ps1readspinBox.setValue(cur1)
+			self.ps1spinBox.setValue(cur1)
+			self.ps1Out.setChecked(self.psus[0].psu.outputs[0].enabled)
+			self.ps2readspinBox.setValue(cur2)
+			self.ps2spinBox.setValue(cur2)
+			self.ps2Out.setChecked(self.psus[1].psu.outputs[0].enabled)
 		
 		#self.btnForward.clicked.connect(self.forward)
-		# self.btnForward.clicked.connect(self.absolute)
+		#self.btnForward.clicked.connect(self.absolute)
 		#self.btnBackward.clicked.connect(self.backward)
 		#self.btnHome.clicked.connect(self.home)
 		#self.verticalSlider.valueChanged.connect(self.on_slider_drag)
@@ -153,6 +167,15 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.QWP_left_pos.setMinimum(-165)
 				self.QWP_left_pos.setMaximum(165)
 				self.QWP_left_pos.setProperty("value", -130)
+		else:
+			self.absCoordset[1].setMinimum(0)
+			self.absCoordset[1].setMaximum(359)
+			self.QWP_right_pos.setMinimum(0)
+			self.QWP_right_pos.setMaximum(359)
+			self.QWP_right_pos.setProperty("value", 265)
+			self.QWP_left_pos.setMinimum(0)
+			self.QWP_left_pos.setMaximum(359)
+			self.QWP_left_pos.setProperty("value", 175)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -403,46 +426,67 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def AFP(self):
 		self.animAFP.start()
-		if self.afp_bool == False:
-			self.afp_bool = True
+		#Set new spin state value based on sequencing method used
+		if self.AFPTimerOut.isChecked():
+			#If spin is already flipped start the octet at the 5th index
+			if self.afp_ind == 0 and self.AFPDrop.currentIndex() == 1 and self.afp_bool == True:
+				self.afp_ind = 4
+			#print(self.afp_ind)
+			#print(self.AFPDrop.currentText()[self.afp_ind])
+			if self.AFPDrop.currentText()[self.afp_ind] == "0":
+				self.afp_bool = False
+			else:
+				self.afp_bool = True
+			#print(self.afp_old)
+			#print(self.afp_bool)
+			#Increment index value
+			self.afp_ind += 1
+			if self.afp_ind == 8:
+				self.afp_ind = 0 
+		#If not using timed sequencing just flip spin to opposite value
 		else:
-			self.afp_bool = False
+			if self.afp_bool == False:
+				self.afp_bool = True
+			else:
+				self.afp_bool = False
 
-		if self.sim==False:
-			print('Output triggered')
-			if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+		if self.afp_bool != self.afp_old:
+			if self.sim==False:
+				#print('Output triggered')
+				if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+					if (self.afp_bool):
+						print("Flipped spin")
+					else:
+						print("Original spin")
+				else:
+					print("Status bit unsuccessful.")
+				self.task.start()
+				self.task.wait_until_done()
+				self.task.stop()
+				
+				#Flip rotation of QWP
+				if self.afp_bool == False:
+					self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
+				else:
+					self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
+
+				#Function generator code
+				#self.srs.trigger()
+			else:
+				#print("Spin flipped")
 				if (self.afp_bool):
 					print("Flipped spin")
 				else:
 					print("Original spin")
-			else:
-				print("Status bit unsuccessful.")
-			self.task.start()
-			self.task.wait_until_done()
-			self.task.stop()
-			
-			#Flip rotation of QWP
-			if self.afp_bool == False:
-				self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
-			else:
-				self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
-			print('Task complete\n')
 
-			#Function generator code
-			#self.srs.trigger()
-		else:
-			print("Spin flipped")
-			if (self.afp_bool):
-				print("Flipped spin")
-			else:
-				print("Original spin")
-
-			#Flip rotation of QWP
-			if self.afp_bool == False:
-				self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
-			else:
-				self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
-			print('Task complete\n')
+				#Flip rotation of QWP
+				if self.afp_bool == False:
+					self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
+				else:
+					self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
+		
+		#Set boolean value of current spin state
+		self.afp_old = self.afp_bool
 	
 	def AFPSendWvfm(self):
 		if self.sim==False:
@@ -672,6 +716,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.AFPOut.click()
 		else:
 			print("No waveform loaded. Loading now...")
+			print("First flip will occur in {:.0f} seconds".format(self.afptime.value()))
 			self.AFPwave.click()
 
 	def afptimerun(self):
@@ -685,6 +730,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.AFPTimerOut.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
 			print("AFP stopped")
 			self.afptimer.stop()
+			self.afp_ind = 0
 
 	def on_slider_release(self):
 		val = self.verticalSlider.value()
@@ -715,10 +761,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.cellreadout.setValue(self.oven.read_temperature())
 			
 	def closeEvent(self, event):
-		# Turn off all power supplies
+		# Disconnect all power supplies
 		for psu in self.psus:
-			for output in psu.psu.outputs:
-				output.enabled = False
+			#for output in psu.psu.outputs:
+				#output.enabled = False
 			psu.psu.close()
 			
 		# Close connection to omega controller
@@ -726,6 +772,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.oven.close()
 			self.ovenRelayPort.close()
 
+		# Close AFP tasks
 		if self.digi_task != None:
 			self.task.close()
 			self.digi_task.close()
