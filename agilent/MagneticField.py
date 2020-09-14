@@ -23,7 +23,7 @@ class MagneticField():
 		if sim==False:
 			#ports = find_ports()
 			ix=0
-			print("Testing mag field")
+			#print("Testing mag field")
 			#print(ports)
 			#print(len(ports))
 			#for port in ports:

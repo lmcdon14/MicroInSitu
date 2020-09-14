@@ -91,20 +91,26 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			#Connect Laser
 			if self.las == '770':
 				self.lasSer = ComSerial(sim=simulate)
-				self.lasSer.QuerySetupGUI()   
-				self.lasSer.QueryRefreshGUI()
+				#self.lasSer.QuerySetupGUI()   
+				#self.lasSer.QueryRefreshGUI()
 				self.lasSer.SetComPort(laser_port)
 				self.lasSer.SetComSpeed(laser_baud)
 				self.lasSer.SetComAddress(laser_add)
 				self.lasSer.ConnectPort()
 				self.lasSer.ConnectDevice()
 				self.lasSer.QuerySTT()
+				self.lasprev = self.lasSer.GenData.MC
 				self.lasreadout.setValue(self.lasSer.GenData.MC)
 				self.lasspinBox.setValue(self.lasSer.GenData.MC)
 			else:
 				# 795nm QPC laser control (don't have the serial enabled power supply)
 				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
 					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
+				self.lasSer.write(('I\r').encode())
+				test=self.lasSer.readline()
+				lasval=float(test.decode("utf-8"))
+				self.lasreadout.setValue(lasval)
+				self.lasprev = lasval
 
 			# Connect Omega controller
 			self.oven = cni(oven_port, baudrate=9600)
@@ -131,10 +137,16 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			cur2 = self.psus[1].psu.outputs[0].measure('current')
 			self.ps1readspinBox.setValue(cur1)
 			self.ps1spinBox.setValue(cur1)
-			self.ps1Out.setChecked(self.psus[0].psu.outputs[0].enabled)
+			if self.psus[0].psu.outputs[0].enabled:
+				self.ps1Out.setChecked(True)
+				self.ps1Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+
 			self.ps2readspinBox.setValue(cur2)
 			self.ps2spinBox.setValue(cur2)
-			self.ps2Out.setChecked(self.psus[1].psu.outputs[0].enabled)
+			if self.psus[1].psu.outputs[0].enabled:
+				self.ps2Out.setChecked(True)
+				self.ps2Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+			
 		
 		#self.btnForward.clicked.connect(self.forward)
 		#self.btnForward.clicked.connect(self.absolute)
@@ -200,7 +212,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.ramptimer = QtCore.QTimer()
 		self.ramptimer.setInterval(self.lasint)
 		self.ramptimer.timeout.connect(self.ramptimeout)
-		self.lasprev = 0
 		self.lasdelta = 0.01 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
 		self.failflag = 0
 

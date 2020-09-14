@@ -12,12 +12,12 @@ class PowerSupply():
 				self.psu = ivi.agilent.agilentE3633A(port_str)
 				self.psu.outputs[0].configure_range('voltage', 20)
 				self.psu.outputs[0].voltage_level = 20
-				self.psu.outputs[0].current_limit = 0
+				#self.psu.outputs[0].current_limit = 0
 			else:
 				self.psu = ivi.agilent.agilentE3634A(port_str)
 				self.psu.outputs[0].configure_range('voltage', 50)
 				self.psu.outputs[0].voltage_level = 50
-				self.psu.outputs[0].current_limit = 0
+				#self.psu.outputs[0].current_limit = 0
 		else:
 			self.psu = ivi.agilent.agilentE3633A(port, simulate=sim)
 
