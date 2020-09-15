@@ -46,6 +46,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 		smcport = 'COM8'
 		oven_port = 'COM9'
+		pdlock_port = 'COM8'
 		relay_port = 'COM10'
 		laser_port = 'COM7'
 		laser_baud = '9600'
@@ -112,11 +113,13 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.lasreadout.setValue(lasval)
 				self.lasprev = lasval
 
-			# Connect Omega controller
+			# Connect Omega controllers
 			self.oven = cni(oven_port, baudrate=9600)
 			self.ovenspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
 			self.cellspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
-			
+
+			self.pdlock = cni(pdlock_port, baudrate=9600)
+									
 			#Connect oven relay and switch relay to cell wall
 			self.ovenRelayPort = serial.Serial(relay_port, baudrate=9600, bytesize=8, stopbits=1, timeout=0.5)
 			mybytes = bytearray()
@@ -204,7 +207,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
-		self.timer.setInterval(10000)
+		self.timer.setInterval(3000)
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
@@ -500,40 +503,40 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.afp_old = self.afp_bool
 	
 	def AFPSendWvfm(self):
-		if self.sim==False:
-			self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
-			RFamp = self.RFampspinBox.value()
-			FsweepRate = self.SweepspinBox.value()/1000
-			Ffwhm = self.FWHMspinBox.value()
-			Fcent = self.FcentspinBox.value()
-			Fmin = 0.55*Fcent
-			Fmax = 1.5*Fcent
-			totaltime = (Fmax-Fmin)/(FsweepRate*1e6)
-			npnts = int(totaltime*1e6+0.5)
+		self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
+		RFamp = self.RFampspinBox.value()
+		FsweepRate = self.SweepspinBox.value()/1000
+		Ffwhm = self.FWHMspinBox.value()
+		Fcent = self.FcentspinBox.value()
+		Fmin = 0.55*Fcent
+		Fmax = 1.5*Fcent
+		totaltime = (Fmax-Fmin)/(FsweepRate*1e6)
+		npnts = int(totaltime*1e6+0.5)
+		
+		#data = np.zeros(npnts, dtype='<i2')
+		data = np.zeros(npnts)
+		for x in range (npnts):
+			# Freq = Fmin+FsweepRate*x
+			# given code showed "=" instead of "+" below...
+			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+			# Note factor of 2 in rate to keep peak in correct place
+			#val = int((32676*RFamp/10*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x))+0.5)
+			val = RFamp*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
+			data[x] = val
 			
-			#data = np.zeros(npnts, dtype='<i2')
-			data = np.zeros(npnts)
-			for x in range (npnts):
-				# Freq = Fmin+FsweepRate*x
-				# given code showed "=" instead of "+" below...
-				# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
-				# Note factor of 2 in rate to keep peak in correct place
-				#val = int((32676*RFamp/10*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x))+0.5)
-				val = RFamp*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
-				data[x] = val
-				
-			self.data = data
+		self.data = data
 
-			if (self.plotEnable.isChecked()):
-				plt.clf()
-				plt.close()
-				plt.plot(range(npnts), data, '-o')
-				plt.title('AFP Function')
-				plt.xlabel('Time (us)')
-				plt.ylabel('Voltage (V)')
-				plt.show()
-				print(np.amin(data), np.amax(data))
+		if (self.plotEnable.isChecked()):
+			plt.clf()
+			plt.close()
+			plt.plot(range(npnts), data, '-o')
+			plt.title('AFP Function')
+			plt.xlabel('Time (us)')
+			plt.ylabel('Voltage (V)')
+			plt.show()
+			#print(np.amin(data), np.amax(data))
 			
+		if self.sim==False:
 			if (self.task != None):
 				self.task.close()
 			else:
@@ -549,12 +552,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.writer = AnalogSingleChannelWriter(self.task.out_stream, auto_start=False)
 			print(self.writer.write_many_sample(data))
 			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
-			
-			self.AFPwave.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
 		else:
 			print("Waveform sent")
 			self.AFPOut.setEnabled(True)
 			self.task = 0 # arbitrary value for simulating output
+		self.AFPwave.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
 
 	def AFPSendWvfm_funcgen(self):
 		if self.sim == False:
@@ -760,9 +762,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ps1readspinBox.setValue(self.psus[0].psu.outputs[0].measure('current'))
 			self.ps2readspinBox.setValue(self.psus[1].psu.outputs[0].measure('current'))
 
-			# Update photodiode readouts
-			# self.pdreadout.setValue(self.pds[0].value())
-			# self.pd2readout.setValue(self.pds[1].value())
+			# Update photodiode readout
+			self.pdreadout.setValue(self.pdlock.read_temperature())
+			#self.pd2readout.setValue(self.pds[1].value())
 
 			# Update oven readout (cell/wall)
 			if self.oventog.isChecked(): 
@@ -778,9 +780,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				#output.enabled = False
 			psu.psu.close()
 			
-		# Close connection to omega controller
+		# Close connection to omega controllers and oven relay
 		if self.sim == False:
 			self.oven.close()
+			self.pdlock.close()
 			self.ovenRelayPort.close()
 
 		# Close AFP tasks

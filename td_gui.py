@@ -621,7 +621,7 @@ class Ui_TapeDriveWindow(object):
         self.pd2readout.setReadOnly(True)
         self.pd2readout.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.pd2readout.setAlignment(QtCore.Qt.AlignHCenter)
-        self.pd2readout.setStyleSheet("color: black;")
+        self.pd2readout.setStyleSheet("color: lightgrey;")
         self.pd2readout.setObjectName("pd2readout")
 
         # Laser Current Readout
