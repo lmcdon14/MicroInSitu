@@ -4,23 +4,11 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from td_gui import Ui_TapeDriveWindow
-import elliptec.tapedrive as td
-import elliptec
-import agilent as ag
-import serial
-from PyExpLabSys.drivers.omega_cni import ISeries as cni
-from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
-import instruments as ik
-from instruments.abstract_instruments import FunctionGenerator
-import quantities as pq
+import pyvisa
 import math
 import matplotlib.pyplot as plt
 import array
 import numpy as np
-import nidaqmx
-from nidaqmx.stream_writers import AnalogSingleChannelWriter
-system = nidaqmx.system.system.System.local()
-import pySMC100.smc100
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -28,12 +16,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.setupUi(self)
 		self.sim = simulate
 		self.i=0
-		self.las = '770'
-		self.task = None
-		self.digi_task = None
-		self.afp_bool = False
-		self.afp_old = False
-		self.afp_ind = 0
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -44,27 +26,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
-		smcport = 'COM8'
-		oven_port = 'COM9'
-		pdlock_port = 'COM8'
-		relay_port = 'COM10'
-		laser_port = 'COM7'
-		laser_baud = '9600'
-		laser_add = '6'
-
-		"""
-		Function Generator Code
-		func_gen_port = 'COM8'
-		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
-		self.srs.sendcmd('BCNT 1')
-		self.srs.sendcmd('OFFS 0')
-		self.srs.sendcmd('MENA 0')
-		self.srs.sendcmd('MTYP 5')
-		#self.srs.sendcmd('MDWF 5')
-		self.srs.sendcmd('DPTH -100')
-		"""
-
 		if simulate==False:			
+<<<<<<< HEAD
 			#Connect rotation mount(s)
 			self.tapedrive = td.Tapedrive()
 			i=0
@@ -205,12 +168,17 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		
 		self.AFPOut.clicked.connect(self.AFP)
 		self.AFPwave.clicked.connect(self.AFPSendWvfm)
+=======
+			# Attempt to onnect to Lakeshore 625
+			pass
+>>>>>>> 9bc73b2297c976af1f6984f6a20b3e003ffd5608
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(3000)
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
+<<<<<<< HEAD
 		self.lasint = 1000
 		self.ramptimer = QtCore.QTimer()
 		self.ramptimer.setInterval(self.lasint)
@@ -793,30 +761,16 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				
 			else:
 				self.cellreadout.setValue(self.oven.read_temperature())
+=======
+	def recurring_timer(self):
+		if self.sim==False:
+			#Update power supply readouts
+			pass
+>>>>>>> 9bc73b2297c976af1f6984f6a20b3e003ffd5608
 			
 	def closeEvent(self, event):
-		# Disconnect all power supplies
-		for psu in self.psus:
-			#for output in psu.psu.outputs:
-				#output.enabled = False
-			psu.psu.close()
-			
-		# Close connection to omega controllers and oven relay
-		if self.sim == False:
-			self.oven.close()
-			self.pdlock.close()
-			self.ovenRelayPort.close()
-
-		# Close AFP tasks
-		if self.digi_task != None:
-			self.task.close()
-			self.digi_task.close()
-
-		# Close connection with Newport rotation stage
-		if self.sim == False:
-			if self.tapedrive.motors[1] == None:
-				self.smc100.close()
-				del self.smc100
+		# Disconnect all devices
+		pass
 
 		# and afterwards call the closeEvent of the super-class
 		super(QtWidgets.QMainWindow, self).closeEvent(event)
