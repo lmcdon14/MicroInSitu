@@ -27,7 +27,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu.addAction(exitAction)
 
 		if simulate==False:			
-<<<<<<< HEAD
 			#Connect rotation mount(s)
 			self.tapedrive = td.Tapedrive()
 			i=0
@@ -168,17 +167,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		
 		self.AFPOut.clicked.connect(self.AFP)
 		self.AFPwave.clicked.connect(self.AFPSendWvfm)
-=======
-			# Attempt to onnect to Lakeshore 625
-			pass
->>>>>>> 9bc73b2297c976af1f6984f6a20b3e003ffd5608
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(3000)
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
-<<<<<<< HEAD
 		self.lasint = 1000
 		self.ramptimer = QtCore.QTimer()
 		self.ramptimer.setInterval(self.lasint)
@@ -761,12 +755,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				
 			else:
 				self.cellreadout.setValue(self.oven.read_temperature())
-=======
-	def recurring_timer(self):
-		if self.sim==False:
-			#Update power supply readouts
-			pass
->>>>>>> 9bc73b2297c976af1f6984f6a20b3e003ffd5608
 			
 	def closeEvent(self, event):
 		# Disconnect all devices
