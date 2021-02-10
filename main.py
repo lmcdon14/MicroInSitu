@@ -88,7 +88,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			for device in system.devices:
 				print(device)
 			self.daq = system.devices[0]
-
+			
 			#Connect Laser
 			if self.las == '770':
 				self.lasSer = ComSerial(sim=simulate)
@@ -168,10 +168,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.absCoordset[1].setMaximum(359)
 				self.QWP_right_pos.setMinimum(0)
 				self.QWP_right_pos.setMaximum(359)
-				self.QWP_right_pos.setProperty("value", 265)
+				self.QWP_right_pos.setProperty("value", 46)
 				self.QWP_left_pos.setMinimum(0)
 				self.QWP_left_pos.setMaximum(359)
-				self.QWP_left_pos.setProperty("value", 175)
+				self.QWP_left_pos.setProperty("value", 163)
 			else:
 				self.absCoordset[1].valueChanged.connect(self.newport)
 				self.absCoordset[1].setMinimum(-165)
@@ -187,10 +187,10 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.absCoordset[1].setMaximum(359)
 			self.QWP_right_pos.setMinimum(0)
 			self.QWP_right_pos.setMaximum(359)
-			self.QWP_right_pos.setProperty("value", 265)
+			self.QWP_right_pos.setProperty("value", 46)
 			self.QWP_left_pos.setMinimum(0)
 			self.QWP_left_pos.setMaximum(359)
-			self.QWP_left_pos.setProperty("value", 175)
+			self.QWP_left_pos.setProperty("value", 163)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -466,7 +466,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 		if self.afp_bool != self.afp_old:
 			if self.sim==False:
-				#print('Output triggered')
+				print('Output triggered')
 				if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
 					if (self.afp_bool):
 						print("Flipped spin")
@@ -505,23 +505,31 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def AFPSendWvfm(self):
 		self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
 		RFamp = self.RFampspinBox.value()
-		FsweepRate = self.SweepspinBox.value()/1000
+		FsweepRate = self.SweepspinBox.value()/1000.0
 		Ffwhm = self.FWHMspinBox.value()
 		Fcent = self.FcentspinBox.value()
+		sample_rate = 1.0e6
 		Fmin = 0.55*Fcent
 		Fmax = 1.5*Fcent
-		totaltime = (Fmax-Fmin)/(FsweepRate*1e6)
-		npnts = int(totaltime*1e6+0.5)
+		totaltime = (Fmax-Fmin)/(FsweepRate*1.0e6)
+		npnts = int(totaltime*sample_rate+1)
 		
+		FsweepRate = FsweepRate/sample_rate*1.0e6
 		#data = np.zeros(npnts, dtype='<i2')
 		data = np.zeros(npnts)
 		for x in range (npnts):
 			# Freq = Fmin+FsweepRate*x
 			# given code showed "=" instead of "+" below...
-			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) + math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
+			# Amplitude = math.exp( (x-Fcent)^2/Ffwhm^2 ) = math.exp( -1* ((Fmin + FsweepRate*x)-Fcent)^2/Ffwhm^2 )
 			# Note factor of 2 in rate to keep peak in correct place
 			#val = int((32676*RFamp/10*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x))+0.5)
-			val = RFamp*math.exp(-1*(math.pow(((Fmin + FsweepRate*x)-Fcent),2)/(math.pow(Ffwhm,2))))*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
+			if (self.amEnable.isChecked()):
+				val = RFamp*math.exp(-1*(math.pow((Fmin + FsweepRate*x)-Fcent,2))/(math.pow(Ffwhm,2)))*math.sin(2*3.141592653589793238*(Fmin +0.5*FsweepRate*x)*(x/sample_rate))
+				# Test function
+				# val = RFamp*math.exp(-1*(math.pow((Fmin + FsweepRate*x)-Fcent,2))/(math.pow(Ffwhm,2)))*math.sin(1/2*3.141592653589793238)
+			else:
+				val = RFamp*math.sin(2*math.pi*(Fmin +0.5*FsweepRate*x)*x)
+			#val = -RFamp+RFamp*2*x/npnts
 			data[x] = val
 			
 		self.data = data
@@ -546,11 +554,15 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				#self.digi_task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
 				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
-			self.task = nidaqmx.task.Task()
+			self.task = nidaqmx.Task()
 			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
-			self.task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
-			self.writer = AnalogSingleChannelWriter(self.task.out_stream, auto_start=False)
+			# self.task.ao_channels[0].ao_dac_ref_src = nidaqmx.constants.SourceSelection.INTERNAL
+			# self.task.ao_channels[0].ao_dac_ref_allow_conn_to_gnd = True
+			# self.task.ao_channels[0].ao_dac_ref_conn_to_gnd = True
+			self.task.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
+			self.writer = AnalogSingleChannelWriter(self.task.out_stream)
 			print(self.writer.write_many_sample(data))
+			#self.task.write(data, auto_start=False)
 			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
 		else:
 			print("Waveform sent")
@@ -638,9 +650,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ramptimer.stop()
 		if self.sim==False:
 			if not self.lasSer.QueryOUT():
-				self.lasSer.SetOutputON()
+				if not self.lasSer.SetOutputON():
+					print("Laser failed to turn on. Try again.")
+					self.ramptimer.stop()
 		# Begin ramping laser
 		self.failflag = 0
+		self.rampit = 0
 		self.ramptimer.start()
 		print('Laser ramping to {:4.2f}A at {:4.2f}A/s.'.format(self.lasspinBox.value(), self.rampspinBox.value()))
 		self.anim.start()
@@ -649,8 +664,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		if self.sim==False:
 			if self.las == '770':
 				self.lasSer.QuerySTT()
-				self.lasreadout.setValue(self.lasSer.GenData.MC)
 				lasval = self.lasSer.GenData.MC
+				self.lasreadout.setValue(lasval)
+				if self.rampit == 0:
+					self.lasprev = lasval
+					self.rampit = 1
 			else:
 				self.lasSer.write(('I\r').encode())
 				test=self.lasSer.readline()
@@ -666,62 +684,63 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		# Otherwise continue to attempt to ramp
 		else:
 			# if current laser readout is within allowable tolerance of previous command...
-			if abs(lasval - self.lasprev) < self.lasdelta:
-				# check if current laser readout is within tolerance of overall setpoint
-				if abs(lasval - self.lasspinBox.value()) > self.lasdelta:
-					# if not check if the difference in current value and setpoint is less than allowable change for 
-					# given maximum ramp rate
-					dif = self.lasspinBox.value()-lasval
-					if abs(dif) < self.rampspinBox.value()/(1000/self.lasint):
-						# if ramp rate not exceeded, set power supply current to desired setpoint
+			#print(lasval, self.lasprev)
+			#if abs(lasval - self.lasprev) < self.lasdelta or abs(lasval - self.lasspinBox.value()) < self.lasdelta:
+			# check if current laser readout is within tolerance of overall setpoint
+			if abs(lasval - self.lasspinBox.value()) > self.lasdelta:
+				# if not check if the difference in current value and setpoint is less than allowable change for 
+				# given maximum ramp rate
+				dif = self.lasspinBox.value()-lasval
+				if abs(dif) < self.rampspinBox.value()/(1000/self.lasint):
+					# if ramp rate not exceeded, set power supply current to desired setpoint
+					if self.sim==False:
+						if self.lasSer.SetCurrent(self.lasspinBox.value()):
+							print("Final ramp setting applied.")
+							self.lasprev = self.lasspinBox.value()
+						else:
+							if not self.failflag > 1:
+								print("Failed to continue ramping.")
+							self.failflag += 1
+					else:
+						self.lasprev = self.lasspinBox.value()
+				else:
+					# if ramp rate would have been exceeded, change the current value by the maximum allowable 
+					# amount for the given ramp rate
+					if lasval > self.lasspinBox.value():
 						if self.sim==False:
-							if self.lasSer.SetCurrent(self.lasspinBox.value()):
-								if not self.failflag > 1:
-									print("Final ramp setting applied.")
-								self.lasprev = self.lasspinBox.value()
-							else:
+							if not self.lasSer.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
 								if not self.failflag > 1:
 									print("Failed to continue ramping.")
 								self.failflag += 1
-						else:
-							self.lasprev = self.lasspinBox.value()
-					else:
-						# if ramp rate would have been exceeded, change the current value by the maximum allowable 
-						# amount for the given ramp rate
-						if lasval > self.lasspinBox.value():
-							if self.sim==False:
-								if not self.lasSer.SetCurrent(self.lasprev-self.rampspinBox.value()/(1000/self.lasint)):
-									if not self.failflag > 1:
-										print("Failed to continue ramping.")
-									self.failflag += 1
-								else:
-									self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
 							else:
 								self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
 						else:
-							if self.sim==False:
-								if not self.lasSer.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
-									if not self.failflag > 1:
-										print("Failed to continue ramping.")
-									self.failflag += 1
-								else:
-									self.lasprev = self.lasprev+self.rampspinBox.value()/(1000/self.lasint)
+							self.lasprev = self.lasprev-self.rampspinBox.value()/(1000/self.lasint)
+					else:
+						if self.sim==False:
+							if not self.lasSer.SetCurrent(self.lasprev+self.rampspinBox.value()/(1000/self.lasint)):
+								if not self.failflag > 1:
+									print("Failed to continue ramping.")
+								self.failflag += 1
 							else:
 								self.lasprev = self.lasprev+self.rampspinBox.value()/(1000/self.lasint)
-				else:
-					# desired current setting reached
-					self.lasprev = lasval
-					self.ramptimer.stop()
-					if lasval < self.lasdelta:
-						if self.sim==False:
-							if self.lasSer.SetOutputOFF():
-								print("Laser turned off.")
-							else:
-								print("Laser failed to turn off.")
 						else:
+							self.lasprev = self.lasprev+self.rampspinBox.value()/(1000/self.lasint)
+			else:
+				# desired current setting reached
+				self.lasprev = lasval
+				self.ramptimer.stop()
+				#print(lasval)
+				if lasval < self.lasdelta:
+					if self.sim==False:
+						if self.lasSer.SetOutputOFF():
 							print("Laser turned off.")
+						else:
+							print("Laser failed to turn off.")
 					else:
-						print("Desired laser current reached.")
+						print("Laser turned off.")
+				else:
+					print("Desired laser current reached.")
 			# else wait for current to stabilize to previous laser setting before updating current setpoint
 
 	def afptimeout(self):
@@ -763,7 +782,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ps2readspinBox.setValue(self.psus[1].psu.outputs[0].measure('current'))
 
 			# Update photodiode readout
-			self.pdreadout.setValue(self.pdlock.read_temperature())
+			pdread = self.pdlock.read_temperature()
+			if pdread != None:
+				self.pdreadout.setValue(pdread)
 			#self.pd2readout.setValue(self.pds[1].value())
 
 			# Update oven readout (cell/wall)

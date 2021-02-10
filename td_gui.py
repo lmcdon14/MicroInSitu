@@ -398,6 +398,12 @@ class Ui_TapeDriveWindow(object):
         self.label_plot.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_plot.setAlignment(QtCore.Qt.AlignCenter)
         self.label_plot.setObjectName("label_plot")
+        # Amplitude Modulation Enable Label
+        self.label_am = QtWidgets.QLabel(self.centralwidget)
+        self.label_am.setGeometry(QtCore.QRect(415, 850, 71, 41))
+        self.label_am.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_am.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_am.setObjectName("label_am")
         # Left Hand QWP Setpoint Label
         self.label_left = QtWidgets.QLabel(self.centralwidget)
         self.label_left.setGeometry(QtCore.QRect(320+5, 50, 81, 41))
@@ -494,7 +500,7 @@ class Ui_TapeDriveWindow(object):
         self.lasspinBox.setAlignment(QtCore.Qt.AlignHCenter)
         self.lasspinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.lasspinBox.setMinimum(0.0)
-        self.lasspinBox.setMaximum(45.0)
+        self.lasspinBox.setMaximum(47.5)
         self.lasspinBox.setProperty("value", 0.0)
         self.lasspinBox.setObjectName("lasspinBox")
 
@@ -518,7 +524,7 @@ class Ui_TapeDriveWindow(object):
         self.afptime.setDecimals(0)
         self.afptime.setAlignment(QtCore.Qt.AlignHCenter)
         self.afptime.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
-        self.afptime.setMinimum(10)
+        self.afptime.setMinimum(2)
         self.afptime.setMaximum(1800)
         self.afptime.setProperty("value", 60)
         self.afptime.setObjectName("afptime")
@@ -579,6 +585,11 @@ class Ui_TapeDriveWindow(object):
         self.plotEnable = QtWidgets.QCheckBox(self.centralwidget)
         self.plotEnable.setGeometry(QtCore.QRect(600, 890, 41, 16))
         self.plotEnable.setObjectName("plotEnable")
+        # Amplitude modulation enable
+        self.amEnable = QtWidgets.QCheckBox(self.centralwidget)
+        self.amEnable.setGeometry(QtCore.QRect(441, 890, 41, 16))
+        self.amEnable.setObjectName("amenable")
+        self.amEnable.setChecked(True)
 
         # Cell Wall Readout
         self.cellreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -763,6 +774,7 @@ class Ui_TapeDriveWindow(object):
         self.label_afp3.setText(_translate("TapeDriveWindow", "Sweeprate\n(KHz/s)"))
         self.label_afp4.setText(_translate("TapeDriveWindow", "RF Amplitude\n(V)"))
         self.label_plot.setText(_translate("TapeDriveWindow", "Plot\nEnable"))
+        self.label_am.setText(_translate("TapeDriveWindow", "AM"))
         self.label_left.setText(_translate("TapeDriveWindow", "Spin Down\nSetpoint"))
         self.label_right.setText(_translate("TapeDriveWindow", "Spin Up\nSetpoint"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))
