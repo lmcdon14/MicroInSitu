@@ -4,11 +4,24 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from td_gui import Ui_TapeDriveWindow
-import pyvisa
+import elliptec.tapedrive as td
+import elliptec
+import agilent as ag
+import serial
+from PyExpLabSys.drivers.omega_cni import ISeries as cni
+from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
+import instruments as ik
+from instruments.abstract_instruments import FunctionGenerator
+import quantities as pq
 import math
 import matplotlib.pyplot as plt
 import array
 import numpy as np
+import nidaqmx
+from nidaqmx.stream_writers import AnalogSingleChannelWriter
+system = nidaqmx.system.system.System.local()
+import pySMC100.smc100
+import datetime
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
@@ -16,6 +29,17 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.setupUi(self)
 		self.sim = simulate
 		self.i=0
+		self.las = '770'
+		self.task = None
+		self.digi_task = None
+		self.afp_bool = False
+		self.afp_old = False
+		self.afp_ind = 0
+		self._translate = QtCore.QCoreApplication.translate
+		self.afpcount_int = 0
+		self.afprun_int = 0
+		self.lasprev = 0
+		self.newport_motor = 0
 
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
@@ -25,6 +49,26 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		menubar.setNativeMenuBar(False)
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
+
+		smcport = 'COM8'
+		oven_port = 'COM9'
+		pdlock_port = 'COM8'
+		relay_port = 'COM10'
+		laser_port = 'COM7'
+		laser_baud = '9600'
+		laser_add = '6'
+
+		"""
+		Function Generator Code
+		func_gen_port = 'COM8'
+		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
+		self.srs.sendcmd('BCNT 1')
+		self.srs.sendcmd('OFFS 0')
+		self.srs.sendcmd('MENA 0')
+		self.srs.sendcmd('MTYP 5')
+		#self.srs.sendcmd('MDWF 5')
+		self.srs.sendcmd('DPTH -100')
+		"""
 
 		if simulate==False:			
 			#Connect rotation mount(s)
@@ -135,6 +179,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.QWP_left_pos.setMaximum(359)
 				self.QWP_left_pos.setProperty("value", 163)
 			else:
+				self.newport_motor = 1
 				self.absCoordset[1].valueChanged.connect(self.newport)
 				self.absCoordset[1].setMinimum(-165)
 				self.absCoordset[1].setMaximum(165)
@@ -145,6 +190,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.QWP_left_pos.setMaximum(165)
 				self.QWP_left_pos.setProperty("value", -130)
 		else:
+			self.absCoordset[0].valueChanged.connect(self.absolute1)
+			self.absCoordset[1].valueChanged.connect(self.absolute2)
 			self.absCoordset[1].setMinimum(0)
 			self.absCoordset[1].setMaximum(359)
 			self.QWP_right_pos.setMinimum(0)
@@ -153,6 +200,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.QWP_left_pos.setMinimum(0)
 			self.QWP_left_pos.setMaximum(359)
 			self.QWP_left_pos.setProperty("value", 163)
+		self.rotHome.clicked.connect(self.rotation_homing)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -180,6 +228,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.lasdelta = 0.01 # Allowable threshold for laser power supply to be off from setpoint to avoid infinite looping
 		self.failflag = 0
 
+		self.afptime.valueChanged.connect(self.timechange)
 		self.afptimer = QtCore.QTimer()
 		self.afptimer.setInterval(self.afptime.value())
 		self.afptimer.timeout.connect(self.afptimeout)
@@ -206,6 +255,20 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			step = self.spinBox.value()
 			self.absCoords.setValue((oldVal - step)%360)
 	"""
+
+	def rotation_homing(self):
+		self.animRot.start()
+		if self.sim == False:
+			if self.newport_motor == 0:
+				loop = 2
+			else:
+				loop = 1
+
+			for ind in range(loop):
+				self.absCoordset[ind].setProperty("value", 336)
+		else:
+			self.absCoordset[0].setProperty("value",336)
+			self.absCoordset[1].setProperty("value",336)
 
 	def absolute1(self):
 		ind = 0
@@ -401,12 +464,14 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				#print(self.oven.command('R01'))
 
 	def AFP(self):
-		self.animAFP.start()
 		#Set new spin state value based on sequencing method used
 		if self.AFPTimerOut.isChecked():
-			#If spin is already flipped start the octet at the 5th index
-			if self.afp_ind == 0 and self.AFPDrop.currentIndex() == 1 and self.afp_bool == True:
-				self.afp_ind = 4
+			#If spin is already flipped start the octet at the 5th index or the normal sequence at the 2nd index
+			if self.afp_ind == 0 and self.afp_bool == True:
+				if self.AFPDrop.currentIndex() == 1:
+					self.afp_ind = 4
+				else:
+					self.afp_ind = 1
 			#print(self.afp_ind)
 			#print(self.AFPDrop.currentText()[self.afp_ind])
 			if self.AFPDrop.currentText()[self.afp_ind] == "0":
@@ -427,6 +492,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.afp_bool = False
 
 		if self.afp_bool != self.afp_old:
+			self.animAFP.start()
 			if self.sim==False:
 				print('Output triggered')
 				if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
@@ -439,7 +505,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.task.start()
 				self.task.wait_until_done()
 				self.task.stop()
-				
+
 				#Flip rotation of QWP
 				if self.afp_bool == False:
 					self.absCoordset[1].setProperty("value", self.QWP_right_pos.value())
@@ -461,8 +527,20 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				else:
 					self.absCoordset[1].setProperty("value", self.QWP_left_pos.value())
 		
+			self.afpcount_int += 1
+			self.afpcount2.setText(self._translate("TapeDriveWindow", str(self.afpcount_int)))
+
+			if self.AFPTimerOut.isChecked():
+				self.afprun_int += 1
+				self.afpcount1.setText(self._translate("TapeDriveWindow", str(self.afprun_int)))
+			
 		#Set boolean value of current spin state
 		self.afp_old = self.afp_bool
+
+		if self.afp_bool:
+			self.spinlabel.setPixmap(self.pixmap_down)
+		else:
+			self.spinlabel.setPixmap(self.pixmap_up)
 	
 	def AFPSendWvfm(self):
 		self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
@@ -705,18 +783,17 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					print("Desired laser current reached.")
 			# else wait for current to stabilize to previous laser setting before updating current setpoint
 
-	def afptimeout(self):
-		if self.task != None:
-			self.AFPOut.click()
+	def timechange(self):
+		if self.AFPTimerOut.isChecked():
+			print("Time interval change\nAFP running every {:.0f} seconds\nFinishing current interval".format(self.afptime.value()))
 		else:
-			print("No waveform loaded. Loading now...")
-			print("First flip will occur in {:.0f} seconds".format(self.afptime.value()))
-			self.AFPwave.click()
+			self.afpcount.setText(self._translate("TapeDriveWindow", str(datetime.timedelta(seconds=self.afptime.value()))[2:]))
 
 	def afptimerun(self):
 		if self.AFPTimerOut.isChecked():
 			self.AFPTimerOut.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}")
-			self.afptimer.setInterval(self.afptime.value()*1000)
+			self.afptimer.setInterval(1000)
+			self.time_left_int = 0
 			print("AFP running every {:.0f} seconds".format(self.afptime.value()))
 			self.afptimeout()
 			self.afptimer.start()
@@ -724,7 +801,26 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.AFPTimerOut.setStyleSheet("QPushButton {background-color: rgba(0,0,0,0.5); color: white; border-radius:5px;}")
 			print("AFP stopped")
 			self.afptimer.stop()
+			self.afpcount.setText(self._translate("TapeDriveWindow", str(datetime.timedelta(seconds=self.afptime.value()))[2:]))
 			self.afp_ind = 0
+			self.afprun_int = 0
+			self.afpcount1.setText(self._translate("TapeDriveWindow", "0"))
+
+	def afptimeout(self):
+		time_str = str(datetime.timedelta(seconds=self.time_left_int))[2:]
+		self.afpcount.setText(self._translate("TapeDriveWindow", time_str))
+
+		if self.time_left_int == 0:
+			self.time_left_int = self.afptime.value() - 1
+
+			if self.task != None:
+				self.AFPOut.click()
+			else:
+				print("No waveform loaded. Loading now...")
+				print("First flip will occur in {:.0f} seconds".format(self.afptime.value()))
+				self.AFPwave.click()
+		else:
+			self.time_left_int -= 1
 
 	def on_slider_release(self):
 		val = self.verticalSlider.value()
@@ -757,8 +853,28 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.cellreadout.setValue(self.oven.read_temperature())
 			
 	def closeEvent(self, event):
-		# Disconnect all devices
-		pass
+		# Disconnect all power supplies
+		for psu in self.psus:
+			#for output in psu.psu.outputs:
+				#output.enabled = False
+			psu.psu.close()
+			
+		# Close connection to omega controllers and oven relay
+		if self.sim == False:
+			self.oven.close()
+			self.pdlock.close()
+			self.ovenRelayPort.close()
+
+		# Close AFP tasks
+		if self.digi_task != None:
+			self.task.close()
+			self.digi_task.close()
+
+		# Close connection with Newport rotation stage
+		if self.sim == False:
+			if self.tapedrive.motors[1] == None:
+				self.smc100.close()
+				del self.smc100
 
 		# and afterwards call the closeEvent of the super-class
 		super(QtWidgets.QMainWindow, self).closeEvent(event)
