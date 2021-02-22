@@ -65,6 +65,7 @@ class MyButton(QtWidgets.QPushButton):
 
 class Ui_TapeDriveWindow(object):
     def setupUi(self, TapeDriveWindow):
+        degree_sign = u"\N{DEGREE SIGN}"
         # Setup window
         TapeDriveWindow.setObjectName("TapeDriveWindow")
         TapeDriveWindow.resize(640, 1000)
@@ -416,12 +417,14 @@ class Ui_TapeDriveWindow(object):
         self.label_right.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_right.setAlignment(QtCore.Qt.AlignCenter)
         self.label_right.setObjectName("label_right")
+        """
          # 336 deg. homing label
         self.label_rotHome = QtWidgets.QLabel(self.centralwidget)
         self.label_rotHome.setGeometry(QtCore.QRect(270, 155, 100, 41))
         self.label_rotHome.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_rotHome.setAlignment(QtCore.Qt.AlignCenter)
         self.label_rotHome.setObjectName("label_rotHome")
+        """
 
         # Power Supply Control 1
         self.ps1spinBox = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -701,7 +704,7 @@ class Ui_TapeDriveWindow(object):
         self.ps2Out.setObjectName("ps2Out")
 
         # Rotation Homing to 336 deg.
-        self.rotHome = MyButton(self.centralwidget, font2, QtCore.QRect(270, 125, 100, 40), "Rotation\nHome")
+        self.rotHome = MyButton(self.centralwidget, font2, QtCore.QRect(270, 100, 100, 40), "336" + degree_sign + "\nHome")
         self.animRot = QtCore.QPropertyAnimation(self.rotHome, b"zcolor")
         self.animRot.setDuration(750)
         self.animRot.setLoopCount(1)
@@ -709,6 +712,16 @@ class Ui_TapeDriveWindow(object):
         self.animRot.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
         self.animRot.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
         self.animRot.setEndValue(QtGui.QColor(0,0,0,0.5))
+
+        # Rotation Homing
+        self.rotHome2 = MyButton(self.centralwidget, font2, QtCore.QRect(270, 150, 100, 40), "Rotation\nHome")
+        self.animRot2 = QtCore.QPropertyAnimation(self.rotHome, b"zcolor")
+        self.animRot2.setDuration(750)
+        self.animRot2.setLoopCount(1)
+        self.animRot2.setStartValue(QtGui.QColor(0,0,0,0.5))
+        self.animRot2.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
+        self.animRot2.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
+        self.animRot2.setEndValue(QtGui.QColor(0,0,0,0.5))
 
         # Oven Toggle 
         self.oventog = QtWidgets.QPushButton(self.centralwidget)
@@ -821,7 +834,7 @@ class Ui_TapeDriveWindow(object):
         self.label_afp3.setText(_translate("TapeDriveWindow", "Sweeprate\n(KHz/s)"))
         self.label_afp4.setText(_translate("TapeDriveWindow", "RF Amplitude\n(V)"))
         self.label_plot.setText(_translate("TapeDriveWindow", "Plot\nEnable"))
-        self.label_rotHome.setText(_translate("TapeDriveWindow", "(336 deg.)"))
+        #self.label_rotHome.setText(_translate("TapeDriveWindow", "(336 deg.)"))
         self.label_am.setText(_translate("TapeDriveWindow", "AM"))
         self.label_left.setText(_translate("TapeDriveWindow", "Spin Down\nSetpoint"))
         self.label_right.setText(_translate("TapeDriveWindow", "Spin Up\nSetpoint"))

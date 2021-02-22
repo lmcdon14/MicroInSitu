@@ -201,6 +201,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.QWP_left_pos.setMaximum(359)
 			self.QWP_left_pos.setProperty("value", 163)
 		self.rotHome.clicked.connect(self.rotation_homing)
+		self.rotHome2.clicked.connect(self.home)
 
 		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
@@ -297,15 +298,23 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		else:
 			self.absCoords[1].setValue(self.absCoordset[1].value())
 	
-	"""
 	def home(self):
+		self.animRot2.start()
 		if self.sim == False:
-			pos = self.tapedrive.motor.do_('home')
-			if pos != 420:
-				self.absCoords.setValue(pos)
-		else:
-			self.absCoords.setValue(0)
+			pos1 = self.tapedrive.motors[0].do_('home')
+			pos2 = self.tapedrive.motors[1].do_('home')
 
+			if pos1 != 420:
+				self.absCoords[0].setValue(pos1)
+			if pos2 != 420:
+				self.absCoords[1].setValue(pos2)
+		else:
+			self.absCoords[0].setValue(0)
+			self.absCoords[1].setValue(0)
+			self.absCoordset[0].setValue(0)
+			self.absCoordset[1].setValue(0)
+
+	"""
 	def on_slider_drag(self):
 		val = self.verticalSlider.value()
 		self.spinBox.setValue(val)
@@ -494,8 +503,15 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		if self.afp_bool != self.afp_old:
 			self.animAFP.start()
 			if self.sim==False:
+				# Analog workaround
+				if self.afp_bool:
+					val = 3
+				else:
+					val = 0
+
 				print('Output triggered')
-				if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+				#if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+				if self.digi_writer.write_one_sample(val):
 					if (self.afp_bool):
 						print("Flipped spin")
 					else:
@@ -590,9 +606,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			else:
 				self.AFPOut.setEnabled(True)
 				self.digi_task = nidaqmx.task.Task()
-				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=3)
+				#self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
 				#self.digi_task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
-				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
+				#self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
+				self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
 			self.task = nidaqmx.Task()
 			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
