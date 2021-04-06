@@ -81,7 +81,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.i=0
 		self.las = '770'
 		self.task = None
-		self.task2 = None
+		self.trig_task = None
+		self.trig_task2 = None
 		self.digi_task = None
 		if self.loaded == 0:
 			self.afp_bool = False
@@ -760,42 +761,53 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		if self.sim==False:
 			if self.task != None:
 				self.task.close()
-				if self.task2 != None:
-					self.task2.close()
+				if self.trig_task != None:
+					self.trig_task.close()
+					self.trig_task2.close()
 			else:
 				self.AFPOut.setEnabled(True)
 				self.digi_task = nidaqmx.task.Task()
 				#self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=3)
 				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-				#self.digi_task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
-				#self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
-				self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
+				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
+				#self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
-			if self.trigEnable.isChecked():
-				print("Enabling triggering with 0-5V")
 			self.task = nidaqmx.Task()
 			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
-			# self.task.ao_channels[0].ao_dac_ref_src = nidaqmx.constants.SourceSelection.INTERNAL
-			# self.task.ao_channels[0].ao_dac_ref_allow_conn_to_gnd = True
-			# self.task.ao_channels[0].ao_dac_ref_conn_to_gnd = True
 			self.task.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
 			self.writer = AnalogSingleChannelWriter(self.task.out_stream)
 			print("Successfully loaded " + self.writer.write_many_sample(data) + " points")
 			#self.task.write(data, auto_start=False)
 			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
-			if self.trigEnable.isChecked():
-				self.task.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
-				self.task.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source = "Dev1/port0/line0", trigger_edge = nidaqmx.constants.Edge.RISING)
-				self.task.triggers.start_trigger.retriggerable = True
 
-				self.task2 = nidaqmx.Task()
-				self.task2.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
-				self.task2.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
-				self.writer2 = AnalogSingleChannelWriter(self.task2.out_stream)
-				print("Successfully loaded " + self.writer.write_many_sample(data) + " points")
-				self.task2.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
-				self.task2.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source = "Dev1/port0/line0", trigger_edge = nidaqmx.constants.Edge.FALLING)
-				self.task2.triggers.start_trigger.retriggerable = True
+			if self.trigEnable.isChecked():
+				print("Enabling triggering with 0-5V")
+				trig_dat = np.zeros(2)
+				trig_dat[0] = 5
+				trig_dat[1] = 0
+				self.trig_task = nidaqmx.Task()
+				#self.trig_task.do_channels.add_do_chan("Dev1/port0/line20", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				self.trig_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=5)
+				self.trig_task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
+				self.trig_writer = AnalogSingleChannelWriter(self.trig_task.out_stream)
+				#self.trig_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task.out_stream, auto_start=True)
+				self.trig_task.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
+				self.trig_task.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source="Dev1/port0/line0", trigger_edge=nidaqmx.constants.Edge.RISING)
+				self.trig_task.triggers.start_trigger.retriggerable = True
+				self.trig_task.register_done_event(self.AFP)
+				self.trig_writer.write_many_sample(trig_dat)
+
+				self.trig_task2 = nidaqmx.Task()
+				#self.trig_task2.do_channels.add_do_chan("Dev1/port0/line21", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				self.trig_task2.ao_channels.add_ao_voltage_chan("Dev1/ao2", min_val=0, max_val=5)
+				self.trig_task2.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
+				self.trig_writer2 = AnalogSingleChannelWriter(self.trig_task2.out_stream)
+				#self.trig_writer2 = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task2.out_stream, auto_start=True)
+				self.trig_task2.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
+				self.trig_task2.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source="Dev1/port0/line0", trigger_edge=nidaqmx.constants.Edge.FALLING)
+				self.trig_task2.triggers.start_trigger.retriggerable = True
+				self.trig_task2.register_done_event(self.AFP)
+				self.trig_writer2.write_many_sample(trig_dat)
 		else:
 			print("Waveform sent")
 			self.AFPOut.setEnabled(True)
