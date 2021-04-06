@@ -1,4 +1,4 @@
-from agilent import PowerSupply
+import agilent as ag
 
-psu = PowerSupply()
+Field = ag.MagneticField()
 

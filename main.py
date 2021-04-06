@@ -22,25 +22,80 @@ from nidaqmx.stream_writers import AnalogSingleChannelWriter
 system = nidaqmx.system.system.System.local()
 import pySMC100.smc100
 import datetime
+from os import path
+import re
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
 		super().__init__()
-		self.setupUi(self)
+		self.loaded = 0
+
+		#Connect Power Supplies
+		#self.Field = ag.MagneticField(simulate=True)
+		self.Field = ag.MagneticField(simulate=simulate)
+		self.psus = self.Field.psus
+		#If there are 3 supplies power compensation coils separately
+		if self.psus[2] == None:
+			self.comps = 1
+		else:
+			self.comps = 2
+
+		#Initialize GUI
+		self.setupUi(self, comps = self.comps)
+
+		#Load parameters from previous run if config file exists
+		if path.exists("Resources/Config.txt"):
+			print("Loading parameters from last run\n")
+			a_file = open("Resources/Config.txt", "r")
+			list_of_lines = a_file.readlines()
+			numbers = np.ones(len(list_of_lines))
+			for ind, line in enumerate(list_of_lines):
+				numbers[ind] = re.findall(r"[-+]?\d*\.\d+|\d+", line)[0]
+			#print(numbers)
+			a_file.close()
+
+			# Set all loaded parameters
+			if numbers[0] == 1:
+				self.afp_bool = True
+				self.afp_old = True
+			else:
+				self.afp_bool = False
+				self.afp_old = False
+			if self.afp_bool:
+				self.spinlabel.setPixmap(self.pixmap_down)
+			else:
+				self.spinlabel.setPixmap(self.pixmap_up)
+				
+			self.QWP_right_pos.setProperty("value", int(numbers[1]))
+			self.QWP_left_pos.setProperty("value", int(numbers[2]))
+
+			self.FcentspinBox.setProperty("value", int(numbers[5]))
+			self.FWHMspinBox.setProperty("value", int(numbers[6]))
+			self.SweepspinBox.setProperty("value", int(numbers[7]))
+			self.RFampspinBox.setProperty("value", float(numbers[8]))
+			#Set loaded flag
+			self.loaded = 1
+
+		#Initialize other variables
 		self.sim = simulate
 		self.i=0
 		self.las = '770'
 		self.task = None
+		self.task2 = None
 		self.digi_task = None
-		self.afp_bool = False
-		self.afp_old = False
+		if self.loaded == 0:
+			self.afp_bool = False
+			self.afp_old = False
 		self.afp_ind = 0
 		self._translate = QtCore.QCoreApplication.translate
 		self.afpcount_int = 0
 		self.afprun_int = 0
+		self.afprun_int_count = 0
 		self.lasprev = 0
 		self.newport_motor = 0
+		self.switch_state = 0
 
+		#Define destructor function and other GUI parameters
 		exitAction = QtWidgets.QAction(QtGui.QIcon('pics/exit.png'), '&Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
 		exitAction.setStatusTip('Exit/Terminate application')
@@ -50,6 +105,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
+		#hardcode ports (delete after implementing auto-detect function) 
 		smcport = 'COM8'
 		oven_port = 'COM9'
 		pdlock_port = 'COM8'
@@ -59,7 +115,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		laser_add = '6'
 
 		"""
-		Function Generator Code
+		# Function Generator Code
 		func_gen_port = 'COM8'
 		self.srs = ik.srs.SRS345.open_serial(port=func_gen_port)
 		self.srs.sendcmd('BCNT 1')
@@ -76,6 +132,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			i=0
 			for motor in self.tapedrive.motors:
 				if motor != None:
+					#Add logic to detect if position has changed between runs
 					val = motor.get_('position')%360
 					self.absCoords[i].setValue(val)
 					self.absCoordset[i].setValue(val)
@@ -84,6 +141,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 			#If there is only one Thorlabs rotation mount use Newport QWP mount
 			if self.tapedrive.motors[1] == None:
+				# Need logic to check if Newport connects or if there is no QWP mount (or if there is a liquid crystal retarder)
 				self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=True)
 				self.smc100.home()
 				val = self.smc100.get_position_mm()
@@ -94,6 +152,17 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			for device in system.devices:
 				print(device)
 			self.daq = system.devices[0]
+			#Send waveform and set state pin if config file loaded
+			if self.loaded == 1:
+				self.AFPwave.click()
+				print("Setting spin state pin")
+				if self.digi_writer.write_one_sample(val):
+					if (self.afp_bool):
+						print("Flipped spin")
+					else:
+						print("Original spin")
+				else:
+					print("Status bit unsuccessful")
 			
 			#Connect Laser
 			if self.las == '770':
@@ -137,13 +206,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			mybytes.append(2)
 			self.ovenRelayPort.write(mybytes)
 		
-		#Connect Power Supplies
-		#self.Field = ag.MagneticField(simulate=True)
-		self.Field = ag.MagneticField(simulate=simulate)
-		self.psus = self.Field.psus
+		# Set parameters for power supplies
 		if self.sim == False:
 			cur1 = self.psus[0].psu.outputs[0].measure('current')
 			cur2 = self.psus[1].psu.outputs[0].measure('current')
+			if self.comps == 2:
+				cur3 = self.psus[2].psu.outputs[0].measure('current')
 			self.ps1readspinBox.setValue(cur1)
 			self.ps1spinBox.setValue(cur1)
 			if self.psus[0].psu.outputs[0].enabled:
@@ -155,7 +223,16 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			if self.psus[1].psu.outputs[0].enabled:
 				self.ps2Out.setChecked(True)
 				self.ps2Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+
+			if self.comps == 2:
+				self.ps3readspinBox.setValue(cur3)
+				self.ps3spinBox.setValue(cur3)
+				if self.psus[2].psu.outputs[0].enabled:
+					self.ps3Out.setChecked(True)
+					self.ps3Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
 			
+		if self.comps == 2:
+			self.psswitch.clicked.connect(self.switch_ps)
 		
 		#self.btnForward.clicked.connect(self.forward)
 		#self.btnForward.clicked.connect(self.absolute)
@@ -174,10 +251,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.absCoordset[1].setMaximum(359)
 				self.QWP_right_pos.setMinimum(0)
 				self.QWP_right_pos.setMaximum(359)
-				self.QWP_right_pos.setProperty("value", 46)
+				if self.loaded == 0:
+					self.QWP_right_pos.setProperty("value", 46)
 				self.QWP_left_pos.setMinimum(0)
 				self.QWP_left_pos.setMaximum(359)
-				self.QWP_left_pos.setProperty("value", 163)
+				if self.loaded == 0:
+					self.QWP_left_pos.setProperty("value", 163)
 			else:
 				self.newport_motor = 1
 				self.absCoordset[1].valueChanged.connect(self.newport)
@@ -185,10 +264,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.absCoordset[1].setMaximum(165)
 				self.QWP_right_pos.setMinimum(-165)
 				self.QWP_right_pos.setMaximum(165)
-				self.QWP_right_pos.setProperty("value", 130)
+				if self.loaded == 0:
+					self.QWP_right_pos.setProperty("value", 130)
 				self.QWP_left_pos.setMinimum(-165)
 				self.QWP_left_pos.setMaximum(165)
-				self.QWP_left_pos.setProperty("value", -130)
+				if self.loaded == 0:
+					self.QWP_left_pos.setProperty("value", -130)
 		else:
 			self.absCoordset[0].valueChanged.connect(self.absolute1)
 			self.absCoordset[1].valueChanged.connect(self.absolute2)
@@ -196,10 +277,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.absCoordset[1].setMaximum(359)
 			self.QWP_right_pos.setMinimum(0)
 			self.QWP_right_pos.setMaximum(359)
-			self.QWP_right_pos.setProperty("value", 46)
+			if self.loaded == 0:
+				self.QWP_right_pos.setProperty("value", 46)
 			self.QWP_left_pos.setMinimum(0)
 			self.QWP_left_pos.setMaximum(359)
-			self.QWP_left_pos.setProperty("value", 163)
+			if self.loaded == 0:
+				self.QWP_left_pos.setProperty("value", 163)
 		self.rotHome.clicked.connect(self.rotation_homing)
 		self.rotHome2.clicked.connect(self.home)
 
@@ -207,6 +290,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
 		self.ps1Out.toggled.connect(self.ps1enable)
 		self.ps2Out.toggled.connect(self.ps2enable)
+		if self.comps == 2:
+			self.ps3spinBox.valueChanged.connect(self.on_ps3_box)
+			self.ps3Out.toggled.connect(self.ps3enable)
 
 		self.oventog.toggled.connect(self.oventoggle)
 		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
@@ -256,6 +342,19 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			step = self.spinBox.value()
 			self.absCoords.setValue((oldVal - step)%360)
 	"""
+
+	def switch_ps(self):
+		print("Switching compensation coils")
+		if self.switch_state == 0:
+			# Switch US to DS and v/v
+			self.uslabel.setText(self._translate("TapeDriveWindow", "DS"))
+			self.dslabel.setText(self._translate("TapeDriveWindow", "US"))
+			self.switch_state = 1
+		else:
+			# Switch US and DS back to original locations
+			self.dslabel.setText(self._translate("TapeDriveWindow", "DS"))
+			self.uslabel.setText(self._translate("TapeDriveWindow", "US"))
+			self.switch_state = 0
 
 	def rotation_homing(self):
 		self.animRot.start()
@@ -347,7 +446,29 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		psu.outputs[0].current_limit = val
 
 		#if psu.outputs[0].query_output_state(state='constant_current'):
-		print("Compensation field set to {:3.2f}A with constant current.".format(val))
+		if self.comps == 1:
+			print("Compensation field set to {:3.2f}A with constant current.".format(val))
+		else:
+			if self.switch_state == 0:
+				stream = "US"
+			else:
+				stream = "DS"
+			print("{:s} compensation field set to {:3.2f}A with constant current.".format(stream, val))
+		#else:
+			#print("Compensation field set to {:3.2f}A with constant voltage.".format(val))
+
+	def on_ps3_box(self):
+		psu = self.Field.psus[2].psu
+		val = self.ps3spinBox.value()
+		psu.outputs[0].configure_current_limit('regulate', val)
+		psu.outputs[0].current_limit = val
+
+		#if psu.outputs[0].query_output_state(state='constant_current'):\
+		if self.switch_state == 0:
+			stream = "DS"
+		else:
+			stream = "US"
+		print("{:s} compensation field set to {:3.2f}A with constant current.".format(stream, val))
 		#else:
 			#print("Compensation field set to {:3.2f}A with constant voltage.".format(val))
 
@@ -375,15 +496,22 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def ps2enable(self):
 		psu = self.Field.psus[1].psu
+		if self.comps == 1:
+			stream = "C"
+		else:
+			if self.switch_state == 0:
+				stream = "US c"
+			else:
+				stream = "DS c"
 		# if button is checked 
 		if self.ps2Out.isChecked(): 
 			# setting background color to light-blue 
 			self.ps2Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
 			psu.outputs[0].enabled = True
 			if psu.outputs[0].enabled == True:
-				print("Compensation field enabled.")
+				print(stream + "ompensation field enabled.")
 			else:
-				print("Compensation field failed to turn on.")
+				print(stream + "ompensation field failed to turn on.")
 
 		# if it is unchecked 
 		else:
@@ -391,9 +519,35 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ps2Out.setStyleSheet("background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;") 
 			psu.outputs[0].enabled = False
 			if psu.outputs[0].enabled == False:
-				print("Compensation field disabled.")
+				print(stream + "ompensation field disabled.")
 			else:
-				print("Compensation field failed to turn off.")
+				print(stream + "ompensation field failed to turn off.")
+
+	def ps3enable(self):
+		psu = self.Field.psus[2].psu
+		if self.switch_state == 1:
+			stream = "US c"
+		else:
+			stream = "DS c"
+		# if button is checked 
+		if self.ps3Out.isChecked(): 
+			# setting background color to light-blue 
+			self.ps3Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+			psu.outputs[0].enabled = True
+			if psu.outputs[0].enabled == True:
+				print(stream + "ompensation field enabled.")
+			else:
+				print(stream + "ompensation field failed to turn on.")
+
+		# if it is unchecked 
+		else:
+			# set background color back to light-grey 
+			self.ps3Out.setStyleSheet("background-color: rgba(0,0,0,0.5); color: white; border-radius:4px;") 
+			psu.outputs[0].enabled = False
+			if psu.outputs[0].enabled == False:
+				print(stream + "ompensation field disabled.")
+			else:
+				print(stream + "ompensation field failed to turn off.")
 
 	def oventoggle(self):
 		if self.oventog.isChecked(): 
@@ -500,6 +654,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			else:
 				self.afp_bool = False
 
+		self.afprun_int_count += 1
+		self.afpcount3.setText(self._translate("TapeDriveWindow", str(self.afprun_int_count)))
+
 		if self.afp_bool != self.afp_old:
 			self.animAFP.start()
 			if self.sim==False:
@@ -601,17 +758,21 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			#print(np.amin(data), np.amax(data))
 			
 		if self.sim==False:
-			if (self.task != None):
+			if self.task != None:
 				self.task.close()
+				if self.task2 != None:
+					self.task2.close()
 			else:
 				self.AFPOut.setEnabled(True)
 				self.digi_task = nidaqmx.task.Task()
-				self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=3)
-				#self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				#self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=3)
+				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
 				#self.digi_task.timing.cfg_samp_clk_timing(1, sample_mode=nidaqmx.constants.AcquisitionType.FINITE)
 				#self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 				self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
+			if self.trigEnable.isChecked():
+				print("Enabling triggering with 0-5V")
 			self.task = nidaqmx.Task()
 			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
 			# self.task.ao_channels[0].ao_dac_ref_src = nidaqmx.constants.SourceSelection.INTERNAL
@@ -619,9 +780,22 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			# self.task.ao_channels[0].ao_dac_ref_conn_to_gnd = True
 			self.task.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
 			self.writer = AnalogSingleChannelWriter(self.task.out_stream)
-			print(self.writer.write_many_sample(data))
+			print("Successfully loaded " + self.writer.write_many_sample(data) + " points")
 			#self.task.write(data, auto_start=False)
 			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
+			if self.trigEnable.isChecked():
+				self.task.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
+				self.task.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source = "Dev1/port0/line0", trigger_edge = nidaqmx.constants.Edge.RISING)
+				self.task.triggers.start_trigger.retriggerable = True
+
+				self.task2 = nidaqmx.Task()
+				self.task2.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
+				self.task2.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
+				self.writer2 = AnalogSingleChannelWriter(self.task2.out_stream)
+				print("Successfully loaded " + self.writer.write_many_sample(data) + " points")
+				self.task2.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
+				self.task2.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source = "Dev1/port0/line0", trigger_edge = nidaqmx.constants.Edge.FALLING)
+				self.task2.triggers.start_trigger.retriggerable = True
 		else:
 			print("Waveform sent")
 			self.AFPOut.setEnabled(True)
@@ -822,7 +996,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.afpcount.setText(self._translate("TapeDriveWindow", str(datetime.timedelta(seconds=self.afptime.value()))[2:]))
 			self.afp_ind = 0
 			self.afprun_int = 0
+			self.afprun_int_count = 0
 			self.afpcount1.setText(self._translate("TapeDriveWindow", "0"))
+			self.afpcount3.setText(self._translate("TapeDriveWindow", "0"))
 
 	def afptimeout(self):
 		time_str = str(datetime.timedelta(seconds=self.time_left_int))[2:]
@@ -871,11 +1047,20 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.cellreadout.setValue(self.oven.read_temperature())
 			
 	def closeEvent(self, event):
+		# Kill all timers
+		if self.ramptimer.isActive():
+			self.ramptimer.stop()
+		if self.afptimer.isActive():
+			self.afptimer.stop()
+		if self.timer.isActive():
+			self.timer.stop()
+
 		# Disconnect all power supplies
 		for psu in self.psus:
 			#for output in psu.psu.outputs:
 				#output.enabled = False
-			psu.psu.close()
+			if psu != None:
+				psu.psu.close()
 			
 		# Close connection to omega controllers and oven relay
 		if self.sim == False:
@@ -893,6 +1078,16 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			if self.tapedrive.motors[1] == None:
 				self.smc100.close()
 				del self.smc100
+
+		# Save setpoints in text file
+		f = open("Resources/Config.txt","w+")
+		f.write("AFP_bool: {:d}\n".format(1 if self.afp_bool else 0))
+		f.write("Spin up: {:d}\n".format(self.QWP_right_pos.value()))
+		f.write("Spin down: {:d}\n".format(self.QWP_left_pos.value()))
+		f.write("HWP location: {:d}\n".format(self.absCoords[0].value()))
+		f.write("QWP location: {:d}\n".format(self.absCoords[1].value()))
+		f.write("AFP settings: \t{:d}Hz\n\t\t{:d}Hz\n\t\t{:d}kHz/s\n\t\t{:3.1f}V\n".format(int(self.FcentspinBox.value()), int(self.FWHMspinBox.value()), int(self.SweepspinBox.value()), self.RFampspinBox.value()))
+		f.close()
 
 		# and afterwards call the closeEvent of the super-class
 		super(QtWidgets.QMainWindow, self).closeEvent(event)
