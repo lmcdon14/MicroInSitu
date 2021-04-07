@@ -24,19 +24,42 @@ import pySMC100.smc100
 import datetime
 from os import path
 import re
+from pprint import pprint 
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
 		super().__init__()
+		self.sim = simulate
 		self.loaded = 0
+		self.hardcode = False
+
+		#function to go through all ports and print all properties
+		self.printPortInfo()
+		#once properties identified write if statements to determine which port is which
+		if self.hardcode:
+			self.smcport = 'COM8'
+			self.oven_port = 'COM9'
+			self.pdlock_port = 'COM8'
+			self.relay_port = 'COM10'
+			self.laser_port = 'COM7'
+		else:
+			self.smcport = None
+			self.oven_port = None
+			self.pdlock_port = None
+			self.relay_port = None
+			self.laser_port = None
+			self.ps_ports = [None]*3
+			self.discoverPorts()
 
 		#Connect Power Supplies
 		#self.Field = ag.MagneticField(simulate=True)
-		self.Field = ag.MagneticField(simulate=simulate)
+		self.Field = ag.MagneticField(simulate=simulate, ports=self.ps_ports)
 		self.psus = self.Field.psus
 		#If there are 3 supplies power compensation coils separately
 		if self.psus[2] == None:
 			self.comps = 1
+			if self.psus[1] == None:
+				self.comps = 0
 		else:
 			self.comps = 2
 
@@ -77,7 +100,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.loaded = 1
 
 		#Initialize other variables
-		self.sim = simulate
 		self.i=0
 		self.las = '770'
 		self.task = None
@@ -106,12 +128,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(exitAction)
 
-		#hardcode ports (delete after implementing auto-detect function) 
-		smcport = 'COM8'
-		oven_port = 'COM9'
-		pdlock_port = 'COM8'
-		relay_port = 'COM10'
-		laser_port = 'COM7'
 		laser_baud = '9600'
 		laser_add = '6'
 
@@ -137,103 +153,126 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					val = motor.get_('position')%360
 					self.absCoords[i].setValue(val)
 					self.absCoordset[i].setValue(val)
+					if i==0:
+						self.hwplabel.setPixmap(self.pixmap_green)
+					else:
+						self.qwplabel.setPixmap(self.pixmap_green)
 					#motor.set_('stepsize', motor.deg_to_hex(self.verticalSlider.value()))
 					i += 1
 
-			#If there is only one Thorlabs rotation mount use Newport QWP mount
+			#If there is only one Thorlabs rotation mount use Newport QWP mount (if one exists)
 			if self.tapedrive.motors[1] == None:
-				# Need logic to check if Newport connects or if there is no QWP mount (or if there is a liquid crystal retarder)
-				self.smc100 = pySMC100.smc100.SMC100(1, smcport, silent=True)
-				self.smc100.home()
-				val = self.smc100.get_position_mm()
-				self.absCoords[1].setValue(val)
-				self.absCoordset[1].setValue(val)
+				if self.smcport != None:
+					self.qwplabel.setPixmap(self.pixmap_green)
+					self.smc100 = pySMC100.smc100.SMC100(1, self.smcport, silent=True)
+					self.smc100.home()
+					val = self.smc100.get_position_mm()
+					self.absCoords[1].setValue(val)
+					self.absCoordset[1].setValue(val)
 
 			#Connect DAQ board
-			for device in system.devices:
-				print(device)
-			self.daq = system.devices[0]
-			#Send waveform and set state pin if config file loaded
-			if self.loaded == 1:
-				self.AFPwave.click()
-				print("Setting spin state pin")
-				if self.digi_writer.write_one_sample(val):
-					if (self.afp_bool):
-						print("Flipped spin")
+			if len(system.devices)>0:
+				self.afplabel.setPixmap(self.pixmap_green)
+				for device in system.devices:
+					print(device)
+				self.daq = system.devices[0]
+				#Send waveform and set state pin if config file loaded
+				if self.loaded == 1:
+					self.AFPwave.click()
+					print("Setting spin state pin")
+					if self.digi_writer.write_one_sample_one_line(val):
+						if (self.afp_bool):
+							print("Flipped spin")
+						else:
+							print("Original spin")
 					else:
-						print("Original spin")
-				else:
-					print("Status bit unsuccessful")
+						print("Status bit unsuccessful")
+				self.AFPOut.clicked.connect(self.AFP)
+				self.AFPwave.clicked.connect(self.AFPSendWvfm)
 			
 			#Connect Laser
-			if self.las == '770':
-				self.lasSer = ComSerial(sim=simulate)
-				#self.lasSer.QuerySetupGUI()   
-				#self.lasSer.QueryRefreshGUI()
-				self.lasSer.SetComPort(laser_port)
-				self.lasSer.SetComSpeed(laser_baud)
-				self.lasSer.SetComAddress(laser_add)
-				self.lasSer.ConnectPort()
-				self.lasSer.ConnectDevice()
-				self.lasSer.QuerySTT()
-				self.lasprev = self.lasSer.GenData.MC
-				self.lasreadout.setValue(self.lasSer.GenData.MC)
-				self.lasspinBox.setValue(self.lasSer.GenData.MC)
-			else:
-				# 795nm QPC laser control (don't have the serial enabled power supply)
-				self.lasSer = mySerial(port=laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
-					stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
-				self.lasSer.write(('I\r').encode())
-				test=self.lasSer.readline()
-				lasval=float(test.decode("utf-8"))
-				self.lasreadout.setValue(lasval)
-				self.lasprev = lasval
+			if self.laser_port != None:
+				self.laslabel.setPixmap(self.pixmap_green)
+				if self.las == '770':
+					self.lasSer = ComSerial(sim=simulate)
+					#self.lasSer.QuerySetupGUI()   
+					#self.lasSer.QueryRefreshGUI()
+					self.lasSer.SetComPort(self.laser_port)
+					self.lasSer.SetComSpeed(laser_baud)
+					self.lasSer.SetComAddress(laser_add)
+					self.lasSer.ConnectPort()
+					self.lasSer.ConnectDevice()
+					self.lasSer.QuerySTT()
+					self.lasprev = self.lasSer.GenData.MC
+					self.lasreadout.setValue(self.lasSer.GenData.MC)
+					self.lasspinBox.setValue(self.lasSer.GenData.MC)
+				else:
+					# 795nm QPC laser control (don't have the serial enabled power supply)
+					self.lasSer = mySerial(port=self.laser_port, baudrate=9600, timeout=1, parity=serial.PARITY_NONE,
+						stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS)
+					self.lasSer.write(('I\r').encode())
+					test=self.lasSer.readline()
+					lasval=float(test.decode("utf-8"))
+					self.lasreadout.setValue(lasval)
+					self.lasprev = lasval
+				self.lasOut.clicked.connect(self.lasRamp)
 
 			# Connect Omega controllers
-			self.oven = cni(oven_port, baudrate=9600)
-			self.ovenspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
-			self.cellspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
+			if self.oven_port != None:
+				self.ovenlabel.setPixmap(self.pixmap_green)
+				self.oven = cni(self.oven_port, baudrate=9600)
+				self.ovenspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
+				self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
 
-			self.pdlock = cni(pdlock_port, baudrate=9600)
+			if self.pdlock_port != None:
+				self.pdlabel.setPixmap(self.pixmap_green)
+				self.pdlock = cni(self.pdlock_port, baudrate=9600)
 									
 			#Connect oven relay and switch relay to cell wall
-			self.ovenRelayPort = serial.Serial(relay_port, baudrate=9600, bytesize=8, stopbits=1, timeout=0.5)
-			mybytes = bytearray()
-			mybytes.append(254)
-			mybytes.append(0)
-			self.ovenRelayPort.write(mybytes)
-			mybytes = bytearray()
-			mybytes.append(254)
-			mybytes.append(2)
-			self.ovenRelayPort.write(mybytes)
-		
+			if self.relay_port != None:
+				self.ovenRelayPort = serial.Serial(self.relay_port, baudrate=9600, bytesize=8, stopbits=1, timeout=0.5)
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(0)
+				self.ovenRelayPort.write(mybytes)
+				mybytes = bytearray()
+				mybytes.append(254)
+				mybytes.append(2)
+				self.ovenRelayPort.write(mybytes)
+				self.oventog.toggled.connect(self.oventoggle)
+				self.cellspinBox.setValue(int(self.oven.command('R01').replace('2', '0', 1),16)/10)
+				self.cellspinBox.valueChanged.connect(self.cellsetpoint)
+
 		# Set parameters for power supplies
 		if self.sim == False:
-			cur1 = self.psus[0].psu.outputs[0].measure('current')
-			cur2 = self.psus[1].psu.outputs[0].measure('current')
+			if self.psus[0] != None:
+				cur1 = self.psus[0].psu.outputs[0].measure('current')
+				self.ps1readspinBox.setValue(cur1)
+				self.ps1spinBox.setValue(cur1)
+				if self.psus[0].psu.outputs[0].enabled:
+					self.ps1Out.setChecked(True)
+					self.ps1Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+				self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
+				self.ps1Out.toggled.connect(self.ps1enable)
+			if self.comps > 0:
+				cur2 = self.psus[1].psu.outputs[0].measure('current')
+				self.ps2readspinBox.setValue(cur2)
+				self.ps2spinBox.setValue(cur2)
+				if self.psus[1].psu.outputs[0].enabled:
+					self.ps2Out.setChecked(True)
+					self.ps2Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
+				self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
+				self.ps2Out.toggled.connect(self.ps2enable)
 			if self.comps == 2:
 				cur3 = self.psus[2].psu.outputs[0].measure('current')
-			self.ps1readspinBox.setValue(cur1)
-			self.ps1spinBox.setValue(cur1)
-			if self.psus[0].psu.outputs[0].enabled:
-				self.ps1Out.setChecked(True)
-				self.ps1Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
-
-			self.ps2readspinBox.setValue(cur2)
-			self.ps2spinBox.setValue(cur2)
-			if self.psus[1].psu.outputs[0].enabled:
-				self.ps2Out.setChecked(True)
-				self.ps2Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
-
-			if self.comps == 2:
 				self.ps3readspinBox.setValue(cur3)
 				self.ps3spinBox.setValue(cur3)
 				if self.psus[2].psu.outputs[0].enabled:
 					self.ps3Out.setChecked(True)
 					self.ps3Out.setStyleSheet("background-color: lightblue; color: white; border-radius:4px;") 
-			
-		if self.comps == 2:
-			self.psswitch.clicked.connect(self.switch_ps)
+				self.ps3spinBox.valueChanged.connect(self.on_ps3_box)
+				self.ps3Out.toggled.connect(self.ps3enable)
+				self.psswitch.clicked.connect(self.switch_ps)
 		
 		#self.btnForward.clicked.connect(self.forward)
 		#self.btnForward.clicked.connect(self.absolute)
@@ -286,23 +325,6 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.QWP_left_pos.setProperty("value", 163)
 		self.rotHome.clicked.connect(self.rotation_homing)
 		self.rotHome2.clicked.connect(self.home)
-
-		self.ps1spinBox.valueChanged.connect(self.on_ps1_box)
-		self.ps2spinBox.valueChanged.connect(self.on_ps2_box)
-		self.ps1Out.toggled.connect(self.ps1enable)
-		self.ps2Out.toggled.connect(self.ps2enable)
-		if self.comps == 2:
-			self.ps3spinBox.valueChanged.connect(self.on_ps3_box)
-			self.ps3Out.toggled.connect(self.ps3enable)
-
-		self.oventog.toggled.connect(self.oventoggle)
-		self.cellspinBox.valueChanged.connect(self.cellsetpoint)
-		self.ovenspinBox.valueChanged.connect(self.ovensetpoint)
-
-		self.lasOut.clicked.connect(self.lasRamp)
-		
-		self.AFPOut.clicked.connect(self.AFP)
-		self.AFPwave.clicked.connect(self.AFPSendWvfm)
 		
 		self.timer = QtCore.QTimer()
 		self.timer.setInterval(3000)
@@ -322,6 +344,28 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.afptimer.timeout.connect(self.afptimeout)
 		self.AFPTimerOut.clicked.connect(self.afptimerun)
 
+	# Go through all ports and determine which devices are connected to each
+	def discoverPorts(self):
+		for port in self.ports:
+			if "Laser" in port.description:
+				self.laser_port = port
+				"""
+				self.smcport = None
+				self.oven_port = None
+				self.pdlock_port = None
+				self.relay_port = None
+				self.ps_ports = [None]*3
+				"""
+	# Print all port info
+	def printPortInfo(self):
+		if self.sim==False:
+			self.ports = ag.find_ports()
+			print(len(self.ports))
+			for port in self.ports:
+				print(port)
+				pprint(vars(port), indent=2)
+				#if port.serial_number in self.sns:
+			
 	"""
 	def forward(self):
 		if self.sim == False:
@@ -662,14 +706,14 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.animAFP.start()
 			if self.sim==False:
 				# Analog workaround
-				if self.afp_bool:
-					val = 3
-				else:
-					val = 0
+				# if self.afp_bool:
+				# 	val = 3
+				# else:
+				# 	val = 0
 
 				print('Output triggered')
-				#if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
-				if self.digi_writer.write_one_sample(val):
+				if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+				#if self.digi_writer.write_one_sample(val):
 					if (self.afp_bool):
 						print("Flipped spin")
 					else:
@@ -767,7 +811,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			else:
 				self.AFPOut.setEnabled(True)
 				self.digi_task = nidaqmx.task.Task()
-				#self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=3)
+				#self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=5)
 				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
 				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 				#self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
@@ -783,11 +827,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			if self.trigEnable.isChecked():
 				print("Enabling triggering with 0-5V")
 				trig_dat = np.zeros(2)
-				trig_dat[0] = 5
+				trig_dat[0] = 1
 				trig_dat[1] = 0
 				self.trig_task = nidaqmx.Task()
 				#self.trig_task.do_channels.add_do_chan("Dev1/port0/line20", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-				self.trig_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=5)
+				self.trig_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=1)
 				self.trig_task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
 				self.trig_writer = AnalogSingleChannelWriter(self.trig_task.out_stream)
 				#self.trig_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task.out_stream, auto_start=True)
@@ -799,7 +843,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 				self.trig_task2 = nidaqmx.Task()
 				#self.trig_task2.do_channels.add_do_chan("Dev1/port0/line21", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-				self.trig_task2.ao_channels.add_ao_voltage_chan("Dev1/ao2", min_val=0, max_val=5)
+				self.trig_task2.ao_channels.add_ao_voltage_chan("Dev1/ao2", min_val=0, max_val=1)
 				self.trig_task2.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
 				self.trig_writer2 = AnalogSingleChannelWriter(self.trig_task2.out_stream)
 				#self.trig_writer2 = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task2.out_stream, auto_start=True)
@@ -1042,21 +1086,30 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def recurring_timer(self):
 		if self.sim==False:
 			#Update power supply readouts
-			self.ps1readspinBox.setValue(self.psus[0].psu.outputs[0].measure('current'))
-			self.ps2readspinBox.setValue(self.psus[1].psu.outputs[0].measure('current'))
+			if self.psus[0] != None:
+				self.ps1readspinBox.setValue(self.psus[0].psu.outputs[0].measure('current'))
+			if self.comps > 0:
+				self.ps2readspinBox.setValue(self.psus[1].psu.outputs[0].measure('current'))
+			if self.comps == 2:
+				self.ps3readspinBox.setValue(self.psus[2].psu.outputs[0].measure('current'))
 
 			# Update photodiode readout
-			pdread = self.pdlock.read_temperature()
-			if pdread != None:
-				self.pdreadout.setValue(pdread)
-			#self.pd2readout.setValue(self.pds[1].value())
+			if self.pdlock_port != None:
+				pdread = self.pdlock.read_temperature()
+				if pdread != None:
+					self.pdreadout.setValue(pdread)
+				#self.pd2readout.setValue(self.pds[1].value())
 
 			# Update oven readout (cell/wall)
-			if self.oventog.isChecked(): 
-				self.ovenreadout.setValue(self.oven.read_temperature())
-				
-			else:
-				self.cellreadout.setValue(self.oven.read_temperature())
+			if self.oven_port != None:
+				if self.relay_port != None:
+					if self.oventog.isChecked(): 
+						self.ovenreadout.setValue(self.oven.read_temperature())
+						
+					else:
+						self.cellreadout.setValue(self.oven.read_temperature())
+				else:
+					self.ovenreadout.setValue(self.oven.read_temperature())
 			
 	def closeEvent(self, event):
 		# Kill all timers
@@ -1076,20 +1129,27 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			
 		# Close connection to omega controllers and oven relay
 		if self.sim == False:
-			self.oven.close()
-			self.pdlock.close()
-			self.ovenRelayPort.close()
+			if self.oven_port != None:
+				self.oven.close()
+			if self.pdlock_port != None:
+				self.pdlock.close()
+			if self.relay_port != None:
+				self.ovenRelayPort.close()
 
 		# Close AFP tasks
 		if self.digi_task != None:
 			self.task.close()
 			self.digi_task.close()
+		if self.trig_task != None:
+			self.trig_task.close()
+			self.trig_task2.close()
 
 		# Close connection with Newport rotation stage
 		if self.sim == False:
 			if self.tapedrive.motors[1] == None:
-				self.smc100.close()
-				del self.smc100
+				if self.smcport != None:
+					self.smc100.close()
+					del self.smc100
 
 		# Save setpoints in text file
 		f = open("Resources/Config.txt","w+")

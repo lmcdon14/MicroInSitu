@@ -75,8 +75,8 @@ class Ui_TapeDriveWindow(object):
         icon.addPixmap(QtGui.QPixmap("Resources/bw3.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap("Resources/fw3.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.pixmap_green = QtGui.QPixmap("Resources/green.png").scaled(21, 21, QtCore.Qt.KeepAspectRatio)
-        self.pixmap_red = QtGui.QPixmap("Resources/red.png").scaled(21, 21, QtCore.Qt.KeepAspectRatio)
+        self.pixmap_green = QtGui.QPixmap("Resources/green-removebg.png").scaled(21, 21, QtCore.Qt.KeepAspectRatio)
+        self.pixmap_red = QtGui.QPixmap("Resources/red-removebg.png").scaled(21, 21, QtCore.Qt.KeepAspectRatio)
 
         """
         # Move forward
@@ -235,18 +235,19 @@ class Ui_TapeDriveWindow(object):
         self.label_4.setAlignment(QtCore.Qt.AlignCenter)
         self.label_4.setObjectName("label_4")
         self.hwplabel = QtWidgets.QLabel(self.centralwidget)
-        self.hwplabel.setGeometry(QtCore.QRect(10, 15, 21, 21))
+        self.hwplabel.setGeometry(QtCore.QRect(15, 15, 21, 21))
         self.hwplabel.setPixmap(self.pixmap_red)
-        self.hwplabel.setStyleSheet("QLabel{ background-color: transparent;}")
-        self.qwplabel = QtWidgets.QLabel(self.centralwidget)
-        self.qwplabel.setGeometry(QtCore.QRect(330, 15, 21, 21))
-        self.qwplabel.setPixmap(self.pixmap_red)
+        self.hwplabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # QWP Label
         self.label_qwp = QtWidgets.QLabel(self.centralwidget)
         self.label_qwp.setGeometry(QtCore.QRect(330, 5, 301, 41))
         self.label_qwp.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_qwp.setAlignment(QtCore.Qt.AlignCenter)
         self.label_qwp.setObjectName("label_qwp")
+        self.qwplabel = QtWidgets.QLabel(self.centralwidget)
+        self.qwplabel.setGeometry(QtCore.QRect(335, 15, 21, 21))
+        self.qwplabel.setPixmap(self.pixmap_red)
+        self.qwplabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # PS Label
         self.label_5 = QtWidgets.QLabel(self.centralwidget)
         self.label_5.setGeometry(QtCore.QRect(10, 220, 621, 41))
@@ -255,28 +256,49 @@ class Ui_TapeDriveWindow(object):
         self.label_5.setObjectName("label_5")
         # Main Field Label
         self.label_m = QtWidgets.QLabel(self.centralwidget)
-        self.label_m.setGeometry(QtCore.QRect(70, 275, 181, 31))
+        self.label_m.setGeometry(QtCore.QRect(55, 275, 211, 31))
         self.label_m.setStyleSheet("QLabel {font-size: 18px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_m.setAlignment(QtCore.Qt.AlignCenter)
         self.label_m.setObjectName("label_m")
+        self.mainlabel = QtWidgets.QLabel(self.centralwidget)
+        self.mainlabel.setGeometry(QtCore.QRect(60, 280, 21, 21))
+        self.mainlabel.setPixmap(self.pixmap_red)
+        self.mainlabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # Comp Field Label
         self.label_c = QtWidgets.QLabel(self.centralwidget)
-        self.label_c.setGeometry(QtCore.QRect(390, 275, 181, 31))
+        self.label_c.setGeometry(QtCore.QRect(375, 275, 211, 31))
         self.label_c.setStyleSheet("QLabel {font-size: 18px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_c.setAlignment(QtCore.Qt.AlignCenter)
         self.label_c.setObjectName("label_c")
+        self.complabel = QtWidgets.QLabel(self.centralwidget)
+        self.complabel.setGeometry(QtCore.QRect(380, 280, 21, 21))
+        self.complabel.setPixmap(self.pixmap_red)
+        self.complabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
+        if comps == 2:
+            self.mainlabel = QtWidgets.QLabel(self.centralwidget)
+            self.mainlabel.setGeometry(QtCore.QRect(560, 280, 21, 21))
+            self.mainlabel.setPixmap(self.pixmap_red)
+            self.mainlabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # Oven Label
         self.label_o = QtWidgets.QLabel(self.centralwidget)
         self.label_o.setGeometry(QtCore.QRect(10, 450, 621, 41))
         self.label_o.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_o.setAlignment(QtCore.Qt.AlignCenter)
         self.label_o.setObjectName("label_o")
+        self.ovenlabel = QtWidgets.QLabel(self.centralwidget)
+        self.ovenlabel.setGeometry(QtCore.QRect(15, 460, 21, 21))
+        self.ovenlabel.setPixmap(self.pixmap_red)
+        self.ovenlabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # AFP
         self.label_afp = QtWidgets.QLabel(self.centralwidget)
         self.label_afp.setGeometry(QtCore.QRect(10, 800, 400, 41))
         self.label_afp.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_afp.setAlignment(QtCore.Qt.AlignCenter)
         self.label_afp.setObjectName("label_afp")
+        self.afplabel = QtWidgets.QLabel(self.centralwidget)
+        self.afplabel.setGeometry(QtCore.QRect(15, 810, 21, 21))
+        self.afplabel.setPixmap(self.pixmap_red)
+        self.afplabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # Main Field Setpoint Label
         self.label_ms = QtWidgets.QLabel(self.centralwidget)
         self.label_ms.setGeometry(QtCore.QRect(5, 320, 100, 41))
@@ -290,7 +312,7 @@ class Ui_TapeDriveWindow(object):
         # self.label_msr.setAlignment(QtCore.Qt.AlignCenter)
         # self.label_msr.setObjectName("label_msr")
         # Comp Field Setpoint Label
-        if comps == 1:
+        if comps == 1 or comps == 0:
             self.label_cos = QtWidgets.QLabel(self.centralwidget)
             self.label_cos.setGeometry(QtCore.QRect(325, 320, 100, 41))
             self.label_cos.setStyleSheet("QLabel {font-size: 12px; color: black; border-radius: 5px;}")
@@ -355,6 +377,10 @@ class Ui_TapeDriveWindow(object):
         self.label_lps.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_lps.setAlignment(QtCore.Qt.AlignCenter)
         self.label_lps.setObjectName("label_lps")
+        self.laslabel = QtWidgets.QLabel(self.centralwidget)
+        self.laslabel.setGeometry(QtCore.QRect(15, 630, 21, 21))
+        self.laslabel.setPixmap(self.pixmap_red)
+        self.laslabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # Laser Setpoint Label
         self.label_lassp = QtWidgets.QLabel(self.centralwidget)
         self.label_lassp.setGeometry(QtCore.QRect(5, 675, 100, 41))
@@ -373,6 +399,14 @@ class Ui_TapeDriveWindow(object):
         self.label_pds.setStyleSheet("QLabel {font-size: 24px; background-color: rgba(0,0,0,0.5); color: white; border-radius: 5px;}")
         self.label_pds.setAlignment(QtCore.Qt.AlignCenter)
         self.label_pds.setObjectName("label_pds")
+        self.pdlabel = QtWidgets.QLabel(self.centralwidget)
+        self.pdlabel.setGeometry(QtCore.QRect(335, 630, 21, 21))
+        self.pdlabel.setPixmap(self.pixmap_red)
+        self.pdlabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
+        self.pdlabel2 = QtWidgets.QLabel(self.centralwidget)
+        self.pdlabel2.setGeometry(QtCore.QRect(605, 630, 21, 21))
+        self.pdlabel2.setPixmap(self.pixmap_red)
+        self.pdlabel2.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # PD1 Label
         self.label_pd1 = QtWidgets.QLabel(self.centralwidget)
         self.label_pd1.setGeometry(QtCore.QRect(325, 675, 100, 41))
@@ -479,7 +513,7 @@ class Ui_TapeDriveWindow(object):
         self.ps1readspinBox.setProperty("value", 0.0)
         self.ps1readspinBox.setObjectName("ps1readspinBox")
 
-        if comps == 1:
+        if comps == 1 or comps == 0:
             deltax = 0
         else:
             deltax = -80
@@ -764,7 +798,7 @@ class Ui_TapeDriveWindow(object):
         self.ps1Out.setObjectName("ps1Out")
 
         # Compensation Output Enable
-        if comps == 1:
+        if comps == 1 or comps == 0:
             # Setup controls for compensation power supply
             self.ps2Out = QtWidgets.QPushButton(self.centralwidget)
             self.ps2Out.setGeometry(QtCore.QRect(410, 375, 140, 40))
@@ -922,7 +956,7 @@ class Ui_TapeDriveWindow(object):
         self.label_pd2.setText(_translate("TapeDriveWindow", "EPR\nPhotodiode"))
         self.label_hr.setText(_translate("TapeDriveWindow", "Angle Readout"))
         self.label_qr.setText(_translate("TapeDriveWindow", "Angle Readout"))
-        if comp == 1:
+        if comp == 1 or comp == 0:
             self.label_cos.setText(_translate("TapeDriveWindow", "Current\nSetpoint (A)"))
         else:
             self.uslabel.setText(_translate("TapeDriveWindow", "US"))

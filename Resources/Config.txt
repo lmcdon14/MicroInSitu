@@ -1,5 +1,5 @@
 AFP_bool: 0
-Spin up: 166
+Spin up: 165
 Spin down: 44
 HWP location: 0
 QWP location: 0
