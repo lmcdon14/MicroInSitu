@@ -180,6 +180,18 @@ class Ui_TapeDriveWindow(object):
         self.absCoordset[0].setProperty("value", 0)
         self.absCoordset[0].setObjectName("absCoordset1")
 
+        # HWP Optimum Position
+        self.HWP_opt_pos = QtWidgets.QSpinBox(self.centralwidget)
+        self.HWP_opt_pos.setGeometry(QtCore.QRect(110, 50, 100, 40))
+        self.HWP_opt_pos.setFont(font)
+        self.HWP_opt_pos.setAlignment(QtCore.Qt.AlignHCenter)
+        self.HWP_opt_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.HWP_opt_pos.setKeyboardTracking(False)
+        self.HWP_opt_pos.setMinimum(0)
+        self.HWP_opt_pos.setMaximum(359)
+        self.HWP_opt_pos.setProperty("value", 130)
+        self.HWP_opt_pos.setObjectName("HWP_opt_pos")
+
         # QWP Absolute Coordinates
         self.absCoords[1] = QtWidgets.QSpinBox(self.centralwidget)
         self.absCoords[1].setGeometry(QtCore.QRect(320+110, 150, 100, 40))
@@ -467,6 +479,12 @@ class Ui_TapeDriveWindow(object):
         self.label_trig.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
         self.label_trig.setAlignment(QtCore.Qt.AlignCenter)
         self.label_trig.setObjectName("label_trig")
+        # Optimum HWP Setpoint Label
+        self.label_opt = QtWidgets.QLabel(self.centralwidget)
+        self.label_opt.setGeometry(QtCore.QRect(30, 50, 81, 41))
+        self.label_opt.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_opt.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_opt.setObjectName("label_opt")
         # Left Hand QWP Setpoint Label
         self.label_left = QtWidgets.QLabel(self.centralwidget)
         self.label_left.setGeometry(QtCore.QRect(320+5, 50, 81, 41))
@@ -839,14 +857,14 @@ class Ui_TapeDriveWindow(object):
             font2.setPointSize(10)
 
         # Rotation Homing to 336 deg.
-        self.rotHome = MyButton(self.centralwidget, font2, QtCore.QRect(270, 100, 100, 40), "336" + degree_sign + "\nHome")
-        self.animRot = QtCore.QPropertyAnimation(self.rotHome, b"zcolor")
-        self.animRot.setDuration(750)
-        self.animRot.setLoopCount(1)
-        self.animRot.setStartValue(QtGui.QColor(0,0,0,0.5))
-        self.animRot.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
-        self.animRot.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
-        self.animRot.setEndValue(QtGui.QColor(0,0,0,0.5))
+        # self.rotHome = MyButton(self.centralwidget, font2, QtCore.QRect(270, 100, 100, 40), "336" + degree_sign + "\nHome")
+        # self.animRot = QtCore.QPropertyAnimation(self.rotHome, b"zcolor")
+        # self.animRot.setDuration(750)
+        # self.animRot.setLoopCount(1)
+        # self.animRot.setStartValue(QtGui.QColor(0,0,0,0.5))
+        # self.animRot.setKeyValueAt(0.1, QtGui.QColor("lightblue"))
+        # self.animRot.setKeyValueAt(0.9, QtGui.QColor("lightblue"))
+        # self.animRot.setEndValue(QtGui.QColor(0,0,0,0.5))
 
         # Rotation Homing
         self.rotHome2 = MyButton(self.centralwidget, font2, QtCore.QRect(270, 150, 100, 40), "Rotation\nHome")
@@ -977,6 +995,7 @@ class Ui_TapeDriveWindow(object):
         #self.label_rotHome.setText(_translate("TapeDriveWindow", "(336 deg.)"))
         self.label_am.setText(_translate("TapeDriveWindow", "AM"))
         self.label_trig.setText(_translate("TapeDriveWindow", "Trig"))
+        self.label_opt.setText(_translate("TapeDriveWindow", "Optimum\nPosition"))
         self.label_left.setText(_translate("TapeDriveWindow", "Spin Down\nSetpoint"))
         self.label_right.setText(_translate("TapeDriveWindow", "Spin Up\nSetpoint"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))
