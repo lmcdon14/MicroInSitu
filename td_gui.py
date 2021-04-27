@@ -275,10 +275,10 @@ class Ui_TapeDriveWindow(object):
         self.complabel.setPixmap(self.pixmap_red)
         self.complabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         if comps == 2:
-            self.mainlabel = QtWidgets.QLabel(self.centralwidget)
-            self.mainlabel.setGeometry(QtCore.QRect(560, 280, 21, 21))
-            self.mainlabel.setPixmap(self.pixmap_red)
-            self.mainlabel.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
+            self.complabel2 = QtWidgets.QLabel(self.centralwidget)
+            self.complabel2.setGeometry(QtCore.QRect(560, 280, 21, 21))
+            self.complabel2.setPixmap(self.pixmap_red)
+            self.complabel2.setStyleSheet("QLabel{background-color: transparent; border-radius: 5px;}")
         # Oven Label
         self.label_o = QtWidgets.QLabel(self.centralwidget)
         self.label_o.setGeometry(QtCore.QRect(10, 450, 621, 41))
@@ -715,7 +715,7 @@ class Ui_TapeDriveWindow(object):
         self.trigEnable = QtWidgets.QCheckBox(self.centralwidget)
         self.trigEnable.setGeometry(QtCore.QRect(441, 915, 41, 16))
         self.trigEnable.setObjectName("trigenable")
-        self.trigEnable.setChecked(True)
+        self.trigEnable.setChecked(False)
 
         # Cell Wall Readout
         self.cellreadout = QtWidgets.QDoubleSpinBox(self.centralwidget)
@@ -850,7 +850,7 @@ class Ui_TapeDriveWindow(object):
 
         # Rotation Homing
         self.rotHome2 = MyButton(self.centralwidget, font2, QtCore.QRect(270, 150, 100, 40), "Rotation\nHome")
-        self.animRot2 = QtCore.QPropertyAnimation(self.rotHome, b"zcolor")
+        self.animRot2 = QtCore.QPropertyAnimation(self.rotHome2, b"zcolor")
         self.animRot2.setDuration(750)
         self.animRot2.setLoopCount(1)
         self.animRot2.setStartValue(QtGui.QColor(0,0,0,0.5))
