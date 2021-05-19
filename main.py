@@ -6,7 +6,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from td_gui import Ui_TapeDriveWindow
 import elliptec.tapedrive as td
 import elliptec
-import agilent as ag
+#import agilent as ag
 import serial
 from PyExpLabSys.drivers.omega_cni import ISeries as cni
 from genesys.genesys_project import serialPorts, mySerial, DataContainer, ComSerial
@@ -25,23 +25,37 @@ import datetime
 from os import path
 import re
 from pprint import pprint 
+from pyModbusTCP.client import ModbusClient as mc
 
 class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def __init__(self, simulate=False):
 		super().__init__()
 		self.sim = simulate
 		self.loaded = 0
-		self.hardcode = False
+		self.hardcode = True
+		self.port_i = 0
 
 		#function to go through all ports and print all properties
-		self.printPortInfo()
+		if self.hardcode == False:
+			self.printPortInfo()
 		#once properties identified write if statements to determine which port is which
 		if self.hardcode:
-			self.smcport = 'COM8'
-			self.oven_port = 'COM9'
-			self.pdlock_port = 'COM8'
-			self.relay_port = 'COM10'
-			self.laser_port = 'COM7'
+			self.smcport = None
+			#self.smcport = 'COM19'
+			#self.laser_port = 'COM10'
+			self.laser_port = None
+			#self.pdlock_port = 'COM11'
+			self.pdlock_port = None
+			#self.oven_port = 'COM9'
+			self.oven_port = None
+			#self.relay_port = 'COM13'
+			self.relay_port = None
+			#self.ps_ports = ['COM2', 'COM12', None]
+			self.ps_ports = [None] * 3
+			self.tc_addr = "192.168.127.247"
+			#self.tc_addr = None
+			self.daq = False
+			#self.daq = True
 		else:
 			self.smcport = None
 			self.oven_port = None
@@ -51,10 +65,13 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.ps_ports = [None]*3
 			self.discoverPorts()
 
+		self.tc = None
+
 		#Connect Power Supplies
 		#self.Field = ag.MagneticField(simulate=True)
-		self.Field = ag.MagneticField(simulate=simulate, ports=self.ps_ports)
-		self.psus = self.Field.psus
+		#self.Field = ag.MagneticField(simulate=simulate, ports=self.ps_ports)
+		#self.psus = self.Field.psus
+		self.psus = [None] *3
 		#If there are 3 supplies power compensation coils separately
 		if self.psus[2] == None:
 			self.comps = 1
@@ -65,6 +82,12 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 		#Initialize GUI
 		self.setupUi(self, comps = self.comps)
+		if self.psus[0] != None:
+			self.mainlabel.setPixmap(self.pixmap_green)
+		if self.comps>0:
+			self.complabel.setPixmap(self.pixmap_green)
+		if self.comps==2:
+			self.complabel2.setPixmap(self.pixmap_green)
 
 		#Load parameters from previous run if config file exists
 		if path.exists("Resources/Config.txt"):
@@ -158,7 +181,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					else:
 						self.qwplabel.setPixmap(self.pixmap_green)
 					#motor.set_('stepsize', motor.deg_to_hex(self.verticalSlider.value()))
-					i += 1
+				i += 1
 
 			#If there is only one Thorlabs rotation mount use Newport QWP mount (if one exists)
 			if self.tapedrive.motors[1] == None:
@@ -170,25 +193,37 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 					self.absCoords[1].setValue(val)
 					self.absCoordset[1].setValue(val)
 
+			#Connect TC Controller
+			if self.tc_addr != None:
+				self.tc = mc(host=self.tc_addr, port = 502, auto_open = True, auto_close = True)
+				regs = self.tc.read_input_registers(12,4)
+				if regs:
+					print("Temps:\n1: " + str(regs[0]/10) + "\n2: " + str(regs[1]/10) + "\n3: " + str(regs[2]/10) + "\n4: " + str(regs[3]/10))
+				else:
+					print("read error")
+
 			#Connect DAQ board
-			if len(system.devices)>0:
-				self.afplabel.setPixmap(self.pixmap_green)
-				for device in system.devices:
-					print(device)
-				self.daq = system.devices[0]
-				#Send waveform and set state pin if config file loaded
-				if self.loaded == 1:
-					self.AFPwave.click()
-					print("Setting spin state pin")
-					if self.digi_writer.write_one_sample_one_line(val):
-						if (self.afp_bool):
-							print("Flipped spin")
+			if self.daq == True:
+				if len(system.devices)>0:
+					print(system.tasks.task_names)
+					self.afplabel.setPixmap(self.pixmap_green)
+					for device in system.devices:
+						print(device)
+					self.daq = system.devices[0]
+					#Send waveform and set state pin if config file loaded
+					#print("loading:" + str(self.loaded))
+					if self.loaded == 1:
+						self.AFPwave.clicked.connect(self.AFPSendWvfm)
+						self.AFPwave.click()
+						print("Setting spin state pin")
+						if self.digi_writer.write_one_sample_one_line(self.afp_bool) == 1:
+							if (self.afp_bool):
+								print("Flipped spin")
+							else:
+								print("Original spin")
 						else:
-							print("Original spin")
-					else:
-						print("Status bit unsuccessful")
-				self.AFPOut.clicked.connect(self.AFP)
-				self.AFPwave.clicked.connect(self.AFPSendWvfm)
+							print("Status bit unsuccessful")
+					self.AFPOut.clicked.connect(self.AFP)
 			
 			#Connect Laser
 			if self.laser_port != None:
@@ -327,7 +362,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		self.rotHome2.clicked.connect(self.home)
 		
 		self.timer = QtCore.QTimer()
-		self.timer.setInterval(3000)
+		self.timer.setInterval(5000)
 		self.timer.timeout.connect(self.recurring_timer)
 		self.timer.start()
 
@@ -349,18 +384,23 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		for port in self.ports:
 			if "Laser" in port.description:
 				self.laser_port = port
-				"""
-				self.smcport = None
-				self.oven_port = None
-				self.pdlock_port = None
-				self.relay_port = None
-				self.ps_ports = [None]*3
-				"""
+			elif "Newport" in port.description:
+				self.smcport = port
+			elif "Oven" in port.description:
+				self.oven_port = port
+			elif "PDlock" in port.description:
+				self.pdlock_port = port
+			elif "Relay" in port.description:
+				self.relay_port = port
+			elif "ps_port" in port.description:
+				self.ps_ports[self.port_i] = port
+				self.port_i += 1
+				
 	# Print all port info
 	def printPortInfo(self):
 		if self.sim==False:
 			self.ports = ag.find_ports()
-			print(len(self.ports))
+			#print(len(self.ports))
 			for port in self.ports:
 				print(port)
 				pprint(vars(port), indent=2)
@@ -410,7 +450,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				loop = 1
 
 			for ind in range(loop):
-				self.absCoordset[ind].setProperty("value", 336)
+				if self.tapedrive.motors[ind] != None:
+					self.absCoordset[ind].setProperty("value", 336)
 		else:
 			self.absCoordset[0].setProperty("value",336)
 			self.absCoordset[1].setProperty("value",336)
@@ -418,18 +459,20 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def absolute1(self):
 		ind = 0
 		if self.sim == False:
-			pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
-			if pos != 420:
-				self.absCoords[ind].setValue(pos)
+			if self.tapedrive.motors[ind] != None:
+				pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
+				if pos != 420:
+					self.absCoords[ind].setValue(pos)
 		else:
 			self.absCoords[ind].setValue(self.absCoordset[ind].value())
 			
 	def absolute2(self):
 		ind = 1
 		if self.sim == False:
-			pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
-			if pos != 420:
-				self.absCoords[ind].setValue(pos)
+			if self.tapedrive.motors[ind] != None:
+				pos = self.tapedrive.motors[ind].do_('absolute', data=self.tapedrive.motors[ind].deg_to_hex(self.absCoordset[ind].value()))
+				if pos != 420:
+					self.absCoords[ind].setValue(pos)
 		else:
 			self.absCoords[ind].setValue(self.absCoordset[ind].value())
 
@@ -445,8 +488,14 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 	def home(self):
 		self.animRot2.start()
 		if self.sim == False:
-			pos1 = self.tapedrive.motors[0].do_('home')
-			pos2 = self.tapedrive.motors[1].do_('home')
+			if self.tapedrive.motors[0] != None:
+				pos1 = self.tapedrive.motors[0].do_('home')
+			else:
+				pos1 = 420
+			if self.tapedrive.motors[1] != None:
+				pos2 = self.tapedrive.motors[1].do_('home')
+			else:
+				pos2 = 420
 
 			if pos1 != 420:
 				self.absCoords[0].setValue(pos1)
@@ -760,6 +809,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		else:
 			self.spinlabel.setPixmap(self.pixmap_up)
 	
+	def test(self, *args):
+		print("Triggering test successful")
+		self.AFPOut.click()
+		return 0
+
 	def AFPSendWvfm(self):
 		self.AFPwave.setStyleSheet("QPushButton {background-color: lightblue; color: white; border-radius:5px;}") 
 		RFamp = self.RFampspinBox.value()
@@ -807,51 +861,66 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				self.task.close()
 				if self.trig_task != None:
 					self.trig_task.close()
+				if self.trig_task2 != None:
 					self.trig_task2.close()
 			else:
 				self.AFPOut.setEnabled(True)
 				self.digi_task = nidaqmx.task.Task()
 				#self.digi_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=5)
-				self.digi_task.do_channels.add_do_chan("Dev1/port0/line23", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				self.digi_task.do_channels.add_do_chan("Dev1/port0/line7", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
 				self.digi_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 				#self.digi_writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(self.digi_task.out_stream, auto_start=True)
 
 			self.task = nidaqmx.Task()
-			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao0", min_val=-RFamp, max_val=RFamp)
+			self.task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=-RFamp, max_val=RFamp)
 			self.task.timing.cfg_samp_clk_timing(sample_rate, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=npnts)
 			self.writer = AnalogSingleChannelWriter(self.task.out_stream)
-			print("Successfully loaded " + self.writer.write_many_sample(data) + " points")
+			print("Successfully loaded " + str(self.writer.write_many_sample(data)) + " points")
+			#self.task.register_done_event(self.test)
 			#self.task.write(data, auto_start=False)
 			#self.task.save(save_as='AFPTest', overwrite_existing_task=True, allow_interactive_editing=False)
 
 			if self.trigEnable.isChecked():
-				print("Enabling triggering with 0-5V")
-				trig_dat = np.zeros(2)
-				trig_dat[0] = 1
-				trig_dat[1] = 0
+			#if False:
 				self.trig_task = nidaqmx.Task()
-				#self.trig_task.do_channels.add_do_chan("Dev1/port0/line20", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-				self.trig_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=1)
-				self.trig_task.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
-				self.trig_writer = AnalogSingleChannelWriter(self.trig_task.out_stream)
-				#self.trig_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task.out_stream, auto_start=True)
-				self.trig_task.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
-				self.trig_task.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source="Dev1/port0/line0", trigger_edge=nidaqmx.constants.Edge.RISING)
+				self.trig_task.ai_channels.add_ai_voltage_chan("Dev1/ai0", terminal_config=nidaqmx.constants.TerminalConfiguration.DIFFERENTIAL)
+				self.trig_task.timing.cfg_samp_clk_timing(1e6, active_edge=nidaqmx.constants.Edge.RISING, sample_mode=nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
+				print(self.trig_task.read())
+				"""
+				print("Enabling triggering with 0-5V")
+				trig_dat = np.array([0, 1], dtype='uint32')
+				self.trig_task = nidaqmx.Task()
+				#self.trig_task.ai_channels.add_ai_voltage_chan("Dev1/ai0", terminal_config=nidaqmx.constants.TerminalConfiguration.RSE)
+				self.trig_task.do_channels.add_do_chan("Dev1/port0/line20", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				#self.trig_task.ao_channels.add_ao_voltage_chan("Dev1/ao1", min_val=0, max_val=1)
+				self.trig_task.timing.cfg_samp_clk_timing(1e6, active_edge=nidaqmx.constants.Edge.RISING, sample_mode=nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
+				#self.trig_writer = AnalogSingleChannelWriter(self.trig_task.out_stream)
+				#self.trig_writer.write_many_sample(trig_dat)
+				self.trig_writer = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task.out_stream, auto_start=False)
+				self.trig_task.triggers.start_trigger.cfg_dig_edge_start_trig("/Dev1/PFI0", trigger_edge=nidaqmx.constants.Edge.RISING)
 				self.trig_task.triggers.start_trigger.retriggerable = True
-				self.trig_task.register_done_event(self.AFP)
-				self.trig_writer.write_many_sample(trig_dat)
+				self.trig_task.register_done_event(self.test)
+				print(self.trig_writer.write_many_sample_port_uint32(trig_dat))
+				self.trig_task.start()
+				self.trig_task.wait_until_done()
+				self.trig_task.stop()
+				print("Trig 1 enabled - rising edge")
+				"""
 
+				"""
 				self.trig_task2 = nidaqmx.Task()
-				#self.trig_task2.do_channels.add_do_chan("Dev1/port0/line21", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-				self.trig_task2.ao_channels.add_ao_voltage_chan("Dev1/ao2", min_val=0, max_val=1)
-				self.trig_task2.timing.cfg_samp_clk_timing(1e6, sample_mode = nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
-				self.trig_writer2 = AnalogSingleChannelWriter(self.trig_task2.out_stream)
-				#self.trig_writer2 = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task2.out_stream, auto_start=True)
-				self.trig_task2.triggers.start_trigger.trig_type = nidaqmx.constants.TriggerType.DIGITAL_EDGE
-				self.trig_task2.triggers.start_trigger.cfg_dig_edge_start_trig(trigger_source="Dev1/port0/line0", trigger_edge=nidaqmx.constants.Edge.FALLING)
+				self.trig_task2.do_channels.add_do_chan("Dev1/port0/line21", line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+				self.trig_task2.timing.cfg_samp_clk_timing(1e6, active_edge=nidaqmx.constants.Edge.RISING, sample_mode=nidaqmx.constants.AcquisitionType.FINITE, samps_per_chan=2)
+				self.trig_writer2 = nidaqmx.stream_writers.DigitalSingleChannelWriter(self.trig_task2.out_stream, auto_start=False)
+				self.trig_task2.triggers.start_trigger.cfg_dig_edge_start_trig("/Dev1/PFI0", trigger_edge=nidaqmx.constants.Edge.FALLING)
 				self.trig_task2.triggers.start_trigger.retriggerable = True
-				self.trig_task2.register_done_event(self.AFP)
-				self.trig_writer2.write_many_sample(trig_dat)
+				self.trig_task2.register_done_event(self.test)
+				print(self.trig_writer2.write_many_sample_port_uint32(trig_dat))
+				self.trig_task2.start()
+				self.trig_task2.wait_until_done()
+				self.trig_task2.stop()
+				print("Trig 2 enabled - falling edge")
+				"""
 		else:
 			print("Waveform sent")
 			self.AFPOut.setEnabled(True)
@@ -1085,7 +1154,18 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 	def recurring_timer(self):
 		if self.sim==False:
-			#Update power supply readouts
+			# Triggering workaround
+			if self.trig_task != None:
+				val = self.trig_task.read()
+				# print(val)
+				if val >= 2.5:
+					self.check_bool = 1
+				else:
+					self.check_bool = 0
+				if self.check_bool != self.afp_bool:
+					self.AFPOut.click()
+
+			# Update power supply readouts
 			if self.psus[0] != None:
 				self.ps1readspinBox.setValue(self.psus[0].psu.outputs[0].measure('current'))
 			if self.comps > 0:
@@ -1099,6 +1179,14 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				if pdread != None:
 					self.pdreadout.setValue(pdread)
 				#self.pd2readout.setValue(self.pds[1].value())
+
+			# Update TC readout
+			if self.tc != None:
+				regs = self.tc.read_input_registers(12,4)
+				if regs:
+					print("Temps:\n1: " + str(regs[0]/10) + "\n2: " + str(regs[1]/10) + "\n3: " + str(regs[2]/10) + "\n4: " + str(regs[3]/10))
+				else:
+					print("read error")
 
 			# Update oven readout (cell/wall)
 			if self.oven_port != None:
@@ -1142,7 +1230,8 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.digi_task.close()
 		if self.trig_task != None:
 			self.trig_task.close()
-			self.trig_task2.close()
+			if self.trig_task2 != None:
+				self.trig_task2.close()
 
 		# Close connection with Newport rotation stage
 		if self.sim == False:
@@ -1167,6 +1256,9 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 
 if __name__ == '__main__':
 	import sys
+	#QtWidgets.QApplication.setAttribute(QtCore.Qt.
+	#QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+	#QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 	app = QtWidgets.QApplication(sys.argv)
 	
 	if len(sys.argv)>1:

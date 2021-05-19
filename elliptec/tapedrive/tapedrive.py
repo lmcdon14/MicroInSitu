@@ -20,8 +20,14 @@ class Tapedrive():
 	def connect_motors(self):
 		self.motors = [None] * 2
 		ports = find_ports()
-		i=0
+		#i=0
 		for port in ports:
+			print(port.serial_number)
 			if (port.serial_number in self.sn_mots):
-				self.motors[i] = Motor(port.device)
-				i = i+1
+				if (port.serial_number == "DT03ANGAA"):
+					self.motors[0] = Motor(port.device)
+					print("HWP Connected")
+				else:
+					self.motors[1] = Motor(port.device)
+					print("QWP Connected")
+				#i = i+1

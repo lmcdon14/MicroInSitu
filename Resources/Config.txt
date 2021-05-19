@@ -1,6 +1,6 @@
 AFP_bool: 0
 Spin up: 165
-Spin down: 44
+Spin down: 39
 HWP location: 0
 QWP location: 0
 AFP settings: 	43800Hz

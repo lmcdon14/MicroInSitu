@@ -1,16 +1,8 @@
-#!/usr/bin/env python
+from pyModbusTCP.client import ModbusClient
 
-import socket
-
-
-TCP_IP = '192.168.127.254'
-TCP_PORT = 4001
-BUFFER_SIZE = 1024
-MESSAGE = "Hello, World!"
-
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((TCP_IP, TCP_PORT))
-s.send(MESSAGE)
-data = s.recv(BUFFER_SIZE)
-s.close()
-print("received data: %s" % data)
+c = ModbusClient(host="192.168.127.247", port = 502, auto_open = True, auto_close = True)
+regs = c.read_input_registers(12,4)
+if regs:
+	print("Temps:\n1: " + str(regs[0]/10) + "\n2: " + str(regs[1]/10) + "\n3: " + str(regs[2]/10) + "\n4: " + str(regs[3]/10))
+else:
+	print("read error")
