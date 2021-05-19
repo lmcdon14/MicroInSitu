@@ -181,6 +181,18 @@ class Ui_TapeDriveWindow(object):
         self.absCoordset[0].setProperty("value", 0)
         self.absCoordset[0].setObjectName("absCoordset1")
 
+        # HWP Optimum Position
+        self.HWP_opt_pos = QtWidgets.QSpinBox(self.centralwidget)
+        self.HWP_opt_pos.setGeometry(QtCore.QRect(110, 50, 100, 40))
+        self.HWP_opt_pos.setFont(font)
+        self.HWP_opt_pos.setAlignment(QtCore.Qt.AlignHCenter)
+        self.HWP_opt_pos.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.HWP_opt_pos.setKeyboardTracking(False)
+        self.HWP_opt_pos.setMinimum(0)
+        self.HWP_opt_pos.setMaximum(359)
+        self.HWP_opt_pos.setProperty("value", 130)
+        self.HWP_opt_pos.setObjectName("HWP_opt_pos")
+
         # QWP Absolute Coordinates
         self.absCoords[1] = QtWidgets.QSpinBox(self.centralwidget)
         self.absCoords[1].setGeometry(QtCore.QRect(scale*(320+110), scale*150, scale*100, scale*40))
@@ -468,6 +480,12 @@ class Ui_TapeDriveWindow(object):
         self.label_trig.setStyleSheet("QLabel {font-size: 9x; color: black; border-radius: 5px;}")
         self.label_trig.setAlignment(QtCore.Qt.AlignCenter)
         self.label_trig.setObjectName("label_trig")
+        # Optimum HWP Setpoint Label
+        self.label_opt = QtWidgets.QLabel(self.centralwidget)
+        self.label_opt.setGeometry(QtCore.QRect(30, 50, 81, 41))
+        self.label_opt.setStyleSheet("QLabel {font-size: 12x; color: black; border-radius: 5px;}")
+        self.label_opt.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_opt.setObjectName("label_opt")
         # Left Hand QWP Setpoint Label
         self.label_left = QtWidgets.QLabel(self.centralwidget)
         self.label_left.setGeometry(QtCore.QRect(scale*(320+5), scale*50, scale*81, scale*41))
@@ -978,6 +996,7 @@ class Ui_TapeDriveWindow(object):
         #self.label_rotHome.setText(_translate("TapeDriveWindow", "(336 deg.)"))
         self.label_am.setText(_translate("TapeDriveWindow", "AM"))
         self.label_trig.setText(_translate("TapeDriveWindow", "Trig"))
+        self.label_opt.setText(_translate("TapeDriveWindow", "Optimum\nPosition"))
         self.label_left.setText(_translate("TapeDriveWindow", "Spin Down\nSetpoint"))
         self.label_right.setText(_translate("TapeDriveWindow", "Spin Up\nSetpoint"))
         self.actionQuit.setText(_translate("TapeDriveWindow", "Exit"))

@@ -114,11 +114,11 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 				
 			self.QWP_right_pos.setProperty("value", int(numbers[1]))
 			self.QWP_left_pos.setProperty("value", int(numbers[2]))
-
-			self.FcentspinBox.setProperty("value", int(numbers[5]))
-			self.FWHMspinBox.setProperty("value", int(numbers[6]))
-			self.SweepspinBox.setProperty("value", int(numbers[7]))
-			self.RFampspinBox.setProperty("value", float(numbers[8]))
+			self.HWP_opt_pos.setProperty("value", int(numbers[3]))
+			self.FcentspinBox.setProperty("value", int(numbers[6]))
+			self.FWHMspinBox.setProperty("value", int(numbers[7]))
+			self.SweepspinBox.setProperty("value", int(numbers[8]))
+			self.RFampspinBox.setProperty("value", float(numbers[9]))
 			#Set loaded flag
 			self.loaded = 1
 
@@ -358,7 +358,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 			self.QWP_left_pos.setMaximum(359)
 			if self.loaded == 0:
 				self.QWP_left_pos.setProperty("value", 163)
-		self.rotHome.clicked.connect(self.rotation_homing)
+		#self.rotHome.clicked.connect(self.rotation_homing)
 		self.rotHome2.clicked.connect(self.home)
 		
 		self.timer = QtCore.QTimer()
@@ -1245,6 +1245,7 @@ class mainProgram(QtWidgets.QMainWindow, Ui_TapeDriveWindow):
 		f.write("AFP_bool: {:d}\n".format(1 if self.afp_bool else 0))
 		f.write("Spin up: {:d}\n".format(self.QWP_right_pos.value()))
 		f.write("Spin down: {:d}\n".format(self.QWP_left_pos.value()))
+		f.write("Optimum HWP:  {:d}\n".format(self.HWP_opt_pos.value()))
 		f.write("HWP location: {:d}\n".format(self.absCoords[0].value()))
 		f.write("QWP location: {:d}\n".format(self.absCoords[1].value()))
 		f.write("AFP settings: \t{:d}Hz\n\t\t{:d}Hz\n\t\t{:d}kHz/s\n\t\t{:3.1f}V\n".format(int(self.FcentspinBox.value()), int(self.FWHMspinBox.value()), int(self.SweepspinBox.value()), self.RFampspinBox.value()))
